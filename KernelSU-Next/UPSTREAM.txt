@@ -1,0 +1,6 @@
+KernelSU-Next upstream provenance
+=================================
+Source : https://github.com/KernelSU-Next/KernelSU-Next
+Tag    : v3.1.0-legacy-susfs
+Commit : ba4422f0556e10f40dda1887631d87a18ede4ec5
+Manager version code: 33024

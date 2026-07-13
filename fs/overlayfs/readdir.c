@@ -896,6 +896,7 @@ static int ovl_dir_release(struct inode *inode, struct file *file)
 		fput(od->upperfile);
 	kfree(od);
 
+
 	return 0;
 }
 
