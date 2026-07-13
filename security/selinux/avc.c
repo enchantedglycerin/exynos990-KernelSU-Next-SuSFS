@@ -188,17 +188,19 @@ static void avc_dump_query(struct audit_buffer *ab, struct selinux_state *state,
 	int rc;
 	char *scontext;
 	u32 scontext_len;
-#ifdef CONFIG_KSU_SUSFS
-	struct selinux_audit_data sad;
-#endif
 
 	rc = security_sid_to_context(state, ssid, &scontext, &scontext_len);
 #ifdef CONFIG_KSU_SUSFS
-	if (unlikely(sad.tsid == susfs_ksu_sid && susfs_is_avc_log_spoofing_enabled)) {
+	/* When the denial originates from the KSU domain, spoof the SOURCE context as
+	 * priv_app. Test the real ssid (not an uninitialized struct), emit source-side
+	 * labels (ssid/scontext), and free the scontext allocated above to avoid a leak. */
+	if (unlikely(ssid == susfs_ksu_sid && susfs_is_avc_log_spoofing_enabled)) {
 		if (rc)
-			audit_log_format(ab, " tsid=%d", susfs_priv_app_sid);
-		else
-			audit_log_format(ab, " tcontext=%s", "u:r:priv_app:s0:c512,c768");
+			audit_log_format(ab, "ssid=%d", susfs_priv_app_sid);
+		else {
+			audit_log_format(ab, "scontext=%s", "u:r:priv_app:s0:c512,c768");
+			kfree(scontext);
+		}
 		goto bypass_orig_flow;
 	}
 #endif

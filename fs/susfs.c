@@ -505,7 +505,7 @@ out_copy_to_user:
 
 void susfs_update_sus_kstat(void __user **user_info) {
 	struct st_susfs_sus_kstat info = {0};
-	struct st_susfs_sus_kstat_hlist *new_entry, *tmp_entry;
+	struct st_susfs_sus_kstat_hlist *entry, *found = NULL;
 	struct hlist_node *tmp_node;
 	int bkt;
 
@@ -514,42 +514,41 @@ void susfs_update_sus_kstat(void __user **user_info) {
 		goto out_copy_to_user;
 	}
 	info.target_pathname[SUSFS_MAX_LEN_PATHNAME - 1] = '\0';
+	info.err = -ENOENT;
 
-	hash_for_each_safe(SUS_KSTAT_HLIST, bkt, tmp_node, tmp_entry, node) {
-		if (!strcmp(tmp_entry->info.target_pathname, info.target_pathname)) {
-			if (susfs_update_sus_kstat_inode(tmp_entry->info.target_pathname)) {
-				info.err = -EINVAL;
-				goto out_copy_to_user;
-			}
-			new_entry = kzalloc(sizeof(struct st_susfs_sus_kstat_hlist), GFP_KERNEL);
-			if (!new_entry) {
-				info.err = -ENOMEM;
-				goto out_copy_to_user;
-			}
-			memcpy(&new_entry->info, &tmp_entry->info, sizeof(tmp_entry->info));
-			SUSFS_LOGI("updating target_ino from '%lu' to '%lu' for pathname: '%s' in SUS_KSTAT_HLIST\n",
-							new_entry->info.target_ino, info.target_ino, info.target_pathname);
-			new_entry->target_ino = info.target_ino;
-			new_entry->info.target_ino = info.target_ino;
-			if (info.spoofed_size > 0) {
-				SUSFS_LOGI("updating spoofed_size from '%lld' to '%lld' for pathname: '%s' in SUS_KSTAT_HLIST\n",
-								new_entry->info.spoofed_size, info.spoofed_size, info.target_pathname);
-				new_entry->info.spoofed_size = info.spoofed_size;
-			}
-			if (info.spoofed_blocks > 0) {
-				SUSFS_LOGI("updating spoofed_blocks from '%llu' to '%llu' for pathname: '%s' in SUS_KSTAT_HLIST\n",
-								new_entry->info.spoofed_blocks, info.spoofed_blocks, info.target_pathname);
-				new_entry->info.spoofed_blocks = info.spoofed_blocks;
-			}
-			hash_del(&tmp_entry->node);
-			kfree(tmp_entry);
-			spin_lock(&susfs_spin_lock_sus_kstat);
-			hash_add(SUS_KSTAT_HLIST, &new_entry->node, info.target_ino);
-			spin_unlock(&susfs_spin_lock_sus_kstat);
-			info.err = 0;
-			goto out_copy_to_user;
+	/* Phase 1: locate the entry under the lock (readers take the same lock). */
+	spin_lock(&susfs_spin_lock_sus_kstat);
+	hash_for_each_safe(SUS_KSTAT_HLIST, bkt, tmp_node, entry, node) {
+		if (!strcmp(entry->info.target_pathname, info.target_pathname)) {
+			found = entry;
+			break;
 		}
 	}
+	spin_unlock(&susfs_spin_lock_sus_kstat);
+	if (!found)
+		goto out_copy_to_user;		/* -ENOENT: nothing to update */
+
+	/* Re-flag the inode; kern_path() may sleep, so do this OUTSIDE the lock. */
+	if (susfs_update_sus_kstat_inode(info.target_pathname)) {
+		info.err = -EINVAL;
+		goto out_copy_to_user;
+	}
+
+	/* Phase 2: apply the update under the lock, re-using the same node in place
+	 * (re-hash for the new ino). No kfree/kzalloc -> no use-after-free, no sleep. */
+	spin_lock(&susfs_spin_lock_sus_kstat);
+	hash_del(&found->node);
+	SUSFS_LOGI("updating target_ino from '%lu' to '%lu' for pathname: '%s' in SUS_KSTAT_HLIST\n",
+					found->info.target_ino, info.target_ino, info.target_pathname);
+	found->target_ino = info.target_ino;
+	found->info.target_ino = info.target_ino;
+	if (info.spoofed_size > 0)
+		found->info.spoofed_size = info.spoofed_size;
+	if (info.spoofed_blocks > 0)
+		found->info.spoofed_blocks = info.spoofed_blocks;
+	hash_add(SUS_KSTAT_HLIST, &found->node, info.target_ino);
+	spin_unlock(&susfs_spin_lock_sus_kstat);
+	info.err = 0;
 out_copy_to_user:
 	if (copy_to_user(&((struct st_susfs_sus_kstat __user*)*user_info)->err, &info.err, sizeof(info.err))) {
 		info.err = -EFAULT;
@@ -560,6 +559,7 @@ out_copy_to_user:
 void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat) {
 	struct st_susfs_sus_kstat_hlist *entry;
 
+	spin_lock(&susfs_spin_lock_sus_kstat);
 	hash_for_each_possible(SUS_KSTAT_HLIST, entry, node, ino) {
 		if (entry->target_ino == ino) {
 			stat->dev = entry->info.spoofed_dev;
@@ -574,21 +574,24 @@ void susfs_sus_ino_for_generic_fillattr(unsigned long ino, struct kstat *stat) {
 			stat->ctime.tv_nsec = entry->info.spoofed_ctime_tv_nsec;
 			stat->blocks = entry->info.spoofed_blocks;
 			stat->blksize = entry->info.spoofed_blksize;
-			return;
+			break;
 		}
 	}
+	spin_unlock(&susfs_spin_lock_sus_kstat);
 }
 
 void susfs_sus_ino_for_show_map_vma(unsigned long ino, dev_t *out_dev, unsigned long *out_ino) {
 	struct st_susfs_sus_kstat_hlist *entry;
 
+	spin_lock(&susfs_spin_lock_sus_kstat);
 	hash_for_each_possible(SUS_KSTAT_HLIST, entry, node, ino) {
 		if (entry->target_ino == ino) {
 			*out_dev = entry->info.spoofed_dev;
 			*out_ino = entry->info.spoofed_ino;
-			return;
+			break;
 		}
 	}
+	spin_unlock(&susfs_spin_lock_sus_kstat);
 }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_KSTAT
 

@@ -2,9 +2,6 @@
 # Galaxy S20 (Exynos 990) device-tree overlays - all variants (y2s / x1s / z3s)
 dtbo-y += samsung/exynos990-x1slte_eur_open_00.dtbo
 dtbo-y += samsung/exynos990-x1slte_eur_open_21.dtbo
-dtbo-y += samsung/exynos990-y2s_eur_open_04.dtbo
-dtbo-y += samsung/exynos990-y2s_eur_open_05.dtbo
-dtbo-y += samsung/exynos990-y2s_eur_open_06.dtbo
 dtbo-y += samsung/exynos990-y2slte_eur_open_00.dtbo
 dtbo-y += samsung/exynos990-y2slte_eur_open_21.dtbo
 dtbo-y += samsung/exynos990-z3s_eur_open_16.dtbo
