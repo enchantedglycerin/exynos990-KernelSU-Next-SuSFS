@@ -1,3 +1,15 @@
+// SPDX-License-Identifier: GPL-2.0
+/*
+ * SuSFS v2.0.0 for KernelSU-Next -- non-GKI backport (sys_reboot transport).
+ *
+ * Upstream SuSFS: simonpunk <https://gitlab.com/simonpunk/susfs4ksu>
+ * Non-GKI manual hooks: backslashxx
+ * Non-GKI 4.19 backport reference: JackA1ltman/NonGKI_Kernel_Build_2nd
+ * sus_path ABI aligned to sidex15/susfs4ksu.
+ *
+ * Local modifications by this repository are documented in PROVENANCE.md.
+ * Distributed under GPL-2.0; see COPYING.
+ */
 #include <linux/version.h>
 #include <linux/cred.h>
 #include <linux/fs.h>

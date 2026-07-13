@@ -1,0 +1,33 @@
+NOTICE -- exynos990-KernelSU-Next-SuSFS
+
+This repository is a derivative of the Linux kernel and Samsung's open-source
+kernel release for the Galaxy S20 series (Exynos 990 / universal9830), with
+KernelSU-Next and SuSFS integrated. It is distributed under GPL-2.0 (see COPYING).
+
+Components and their sources
+----------------------------
+
+* Linux kernel -- GPL-2.0. Copyright the Linux kernel contributors.
+
+* Samsung Galaxy S20 (Exynos 990 / universal9830) kernel source -- GPL-2.0,
+  Samsung Open Source Release Center (https://opensource.samsung.com):
+    - SM-G985F_SWA_13_Opensource  (y2s, trunk: shared kernel source + drivers)
+    - SM-G980F_13_Opensource      (x1s, device tree + defconfig)
+    - SM-G988B_13_Opensource      (z3s, device tree + defconfig)
+
+* KernelSU-Next -- GPL-2.0. https://github.com/KernelSU-Next/KernelSU-Next
+  tag v3.1.0-legacy-susfs, commit ba4422f0556e10f40dda1887631d87a18ede4ec5.
+  See KernelSU-Next/LICENSE and KernelSU-Next/UPSTREAM.txt.
+
+* SuSFS v2.0.0 -- GPL-2.0. Original: simonpunk
+  (https://gitlab.com/simonpunk/susfs4ksu); non-GKI manual hooks by backslashxx;
+  non-GKI 4.19 backport reference JackA1ltman/NonGKI_Kernel_Build_2nd
+  @ 230947c728e537049dcef1b12572d85e8699faa5; sus_path ABI aligned to
+  sidex15/susfs4ksu.
+
+* AnyKernel3 (flashable packaging, not part of the kernel) -- osm0sis.
+  https://github.com/osm0sis/AnyKernel3
+
+Exact upstream revisions and the local modifications made in this repository are
+documented in PROVENANCE.md. Per-file copyright and license notices from the
+upstream sources are preserved in their respective files.
