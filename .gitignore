@@ -1,0 +1,107 @@
+#
+# .gitignore — y2s-KernelSU-Next-SuSFS
+# Canonical Linux kernel ignores + this project's build output and toolchain.
+#
+
+# ---- Normal rules (sorted) ---------------------------------------------------
+.*
+*.a
+*.asn1.[ch]
+*.bin
+*.bz2
+*.c.[012]*.*
+*.dtb
+*.dtb.S
+*.dwo
+*.elf
+*.gcno
+*.gz
+*.i
+*.ko
+*.lex.c
+*.ll
+*.lst
+*.lz4
+*.lzma
+*.lzo
+*.mod.c
+*.o
+*.o.*
+*.patch
+*.s
+*.so
+*.so.dbg
+*.symtypes
+*.tab.[ch]
+*.tar
+*.xz
+Module.symvers
+modules.builtin
+modules.order
+
+# ---- Top-level generated files ----------------------------------------------
+/tags
+/TAGS
+/linux
+/vmlinux
+/vmlinux.32
+/vmlinux-gdb.py
+/vmlinuz
+/System.map
+/Module.markers
+
+# ---- Keep these dot-files (un-ignore) ---------------------------------------
+!.clang-format
+!.cocciconfig
+!.get_maintainer.ignore
+!.gitattributes
+!.gitignore
+!.mailmap
+
+# ---- Generated include files ------------------------------------------------
+include/config
+include/generated
+arch/*/include/generated
+
+# ---- Misc tooling -----------------------------------------------------------
+# stgit / quilt
+patches-*
+patches
+series
+# cscope
+cscope.*
+ncscope.*
+# gnu global
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+# id-utils
+ID
+# editor / patch leftovers
+*.orig
+*~
+\#*#
+*.rej
+*.kdev4
+/compile_commands.json
+
+# ==== Project-specific ========================================================
+
+# Out-of-tree build directories (out_ksu10 etc. — multi-GB)
+/out/
+/out_*/
+
+# Bundled toolchains are NOT committed — fetch separately (clang-10 r370808 + gcc-4.9)
+/toolchain/
+
+# Build logs and local scratch
+*.log
+/build/
+
+# Flashable artifacts belong on the Releases page, not in source
+*.img
+*.img.gz
+AnyKernel3*.zip
+boot*.img
+__pycache__/
