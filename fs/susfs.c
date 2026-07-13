@@ -14,9 +14,6 @@
 #include <linux/fdtable.h>
 #include <linux/statfs.h>
 #include <linux/random.h>
-#include <linux/kthread.h>
-#include <linux/delay.h>
-#include <linux/fsnotify_backend.h>
 #include <linux/version.h> // We need check kernel version.
 #include <linux/susfs.h>
 #include "mount.h"
