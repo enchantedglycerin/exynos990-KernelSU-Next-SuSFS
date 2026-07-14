@@ -20,8 +20,9 @@ plus the merged dts Makefile.
 
 **The other drops also differ from G985F in shared driver files** — e.g. `mm/memory.c`, `mm/ksm.c`,
 `firmware/npu/NPU.bin`, and many Mali/NPU sources — and **those differences were NOT imported**. Each
-non-G985F target is therefore the **G985F driver kernel built with that model's defconfig + device
-tree**, not a full build of that model's own source. Whether the un-imported driver differences matter
+non-G985F target is therefore the **G985F driver kernel built with that model's Samsung defconfig**
+(its device-tree overlays are in the repo but are not compiled into the Image or packaged — AnyKernel
+keeps the phone's own DTB), not a full build of that model's own source. Whether the un-imported driver differences matter
 on the other models is **unverified** — only G985F is boot-tested. (Builds are not byte-reproducible: the
 kernel embeds a timestamp/host string, so SHA-256 differs between builds.)
 
@@ -52,6 +53,7 @@ AOSP Clang 10.0.1 (r370808) + GCC 4.9 / binutils 2.27. **Do NOT use Clang 14+** 
 
 ## Testing status
 Only **SM-G985F** is boot-tested (firmware **G985FXXSNHYB1**, Android 13). The other four — **G980F**
-(x1s), **G988B** (z3s), **G986B** (y2s / 5G) and **G981B** (x1s / 5G) — are built with their own defconfig
-+ device tree on the G985F driver kernel (their driver-tree differences are not imported; see above) and
+(x1s), **G988B** (z3s), **G986B** (y2s / 5G) and **G981B** (x1s / 5G) — are built with their own Samsung defconfig
+on the G985F driver kernel (their device trees are in the repo but not packaged — AnyKernel keeps the
+phone's DTB; driver-tree differences not imported) and
 are **not boot-tested**. All non-G985F builds are experimental.

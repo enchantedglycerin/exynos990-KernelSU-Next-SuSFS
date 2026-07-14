@@ -1,7 +1,7 @@
 # AnyKernel3 (vendored)
 
 This directory is [osm0sis/AnyKernel3](https://github.com/osm0sis/AnyKernel3)
-@ `1c9a500dd4aa8081952523126e97eb155aed941b`, vendored here so the flashable zip is reproducible from this
+@ `1c9a500dd4aa8081952523126e97eb155aed941b`, vendored here so the flashable zip is buildable + packageable from this
 repository. It keeps its own license (see `LICENSE` in this directory).
 
 The `anykernel.sh` ramdisk-mod script is intentionally **not** stored here: it is

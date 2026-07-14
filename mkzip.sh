@@ -33,6 +33,7 @@ IMG="$ROOT/out_$MODEL/arch/arm64/boot/Image"
 
 W="$ROOT/.mkzip_$MODEL"; rm -rf "$W"; mkdir -p "$W"
 cp -a "$ROOT/anykernel/." "$W/"
+rm -f "$W/README.md"          # repo doc, not part of the flasher
 cp "$IMG" "$W/Image"
 
 {
