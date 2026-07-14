@@ -28,6 +28,11 @@ respectively; **no separate G986B/G981B source drop was used**, and neither has 
 - **SuSFS v2.0.0** — non-GKI backport, `sys_reboot` transport. Reference: JackA1ltman/NonGKI_Kernel_Build_2nd
   @ `230947c728e537049dcef1b12572d85e8699faa5`; sus_path ABI aligned to sidex15/susfs4ksu.
 
+- **AnyKernel3** (flashable packaging) — https://github.com/osm0sis/AnyKernel3
+  @ `1c9a500dd4aa8081952523126e97eb155aed941b`, vendored under `anykernel/`. `mkzip.sh` generates
+  the per-model `anykernel.sh` (do.devicecheck codenames only; no ro.product.model gate — the model
+  is unreliable in recovery).
+
 ## Toolchain
 AOSP Clang 10.0.1 (r370808) + GCC 4.9 / binutils 2.27. **Do NOT use Clang 14+** (bootloops Exynos 990).
 

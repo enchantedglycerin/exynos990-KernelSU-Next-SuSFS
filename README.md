@@ -33,9 +33,21 @@ Config is layered: `arch/arm64/configs/exynos9830-<model>_defconfig` (Samsung ba
 
 ## Flash
 
-Package `out_<model>/arch/arm64/boot/Image` with [AnyKernel3](https://github.com/osm0sis/AnyKernel3)
-(keeps your device's own dtb + ramdisk) or repack your stock `boot.img`. Requires an unlocked
-bootloader (trips KNOX). **Back up your stock boot image first.**
+Build a flashable zip from the Image with the bundled packaging:
+
+```sh
+./build.sh -m y2s        # -> out_y2s/arch/arm64/boot/Image
+./mkzip.sh  -m y2s       # -> AnyKernel3_KSUNext_SUSFS_y2s.zip   (or x1s / z3s)
+```
+
+`mkzip.sh` wraps the built Image in the vendored [AnyKernel3](https://github.com/osm0sis/AnyKernel3)
+framework (`anykernel/`) and generates `anykernel.sh` with the device-name codename check for the
+model. Flash the zip in TWRP / OrangeFox (it keeps your device's own dtb + ramdisk), or repack your
+stock `boot.img`. Requires an unlocked bootloader (trips KNOX). **Back up your stock boot image first.**
+
+> The check gates on `ro.product.device` (codename), **not** `ro.product.model` — the model is
+> unreliable in recovery and can falsely reject a genuine device. A 4G/5G sibling can share a codename,
+> so **check your exact model before flashing.**
 
 ## Credits
 
