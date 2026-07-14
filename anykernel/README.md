@@ -12,5 +12,5 @@ AnyKernel3 framework.
 
 Build a flashable from source:
 
-    ./build.sh -m y2s      # produces out_y2s/arch/arm64/boot/Image
-    ./mkzip.sh  -m y2s     # produces AnyKernel3_KSUNext_SUSFS_y2s.zip
+    ./build.sh -m g985f    # produces out_g985f/arch/arm64/boot/Image
+    ./mkzip.sh  -m g985f   # produces AnyKernel3_KSUNext_SUSFS_G985F_S20plus.zip

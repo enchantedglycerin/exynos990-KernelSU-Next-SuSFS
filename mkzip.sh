@@ -1,7 +1,7 @@
 #!/bin/bash
 # mkzip.sh -- build a flashable AnyKernel3 zip from an already-built kernel Image.
 #
-# Usage:   ./mkzip.sh -m <y2s|x1s|z3s|g986b|g981b>
+# Usage:   ./mkzip.sh -m <g985f|g980f|g988b|g986b|g981b>   (model number)
 #   Requires ./build.sh -m <model> to have produced out_<model>/arch/arm64/boot/Image.
 #   Produces AnyKernel3_KSUNext_SUSFS_<model>[_EXPERIMENTAL].zip in the repo root.
 #
@@ -14,17 +14,17 @@
 # check cannot tell them apart -- check your exact model before flashing. Non-G985F
 # targets are the G985F driver kernel with that model's config. See README/PROVENANCE.
 set -e
-MODEL=y2s
+MODEL=g985f
 while getopts "m:" o; do case $o in m) MODEL=$OPTARG ;; esac; done
 ROOT="$(cd "$(dirname "$0")" && pwd)"
 
 case "$MODEL" in
-  y2s) CODENAMES="y2s y2slte";  BDEV="Galaxy S20+    SM-G985F";       KSTR="Galaxy S20+ (SM-G985F / Exynos 990)";              EXP="";    ZIP="AnyKernel3_KSUNext_SUSFS_y2s.zip" ;;
-  x1s) CODENAMES="x1s x1slte";  BDEV="Galaxy S20    SM-G980F";        KSTR="Galaxy S20 (SM-G980F / Exynos 990) [EXPERIMENTAL]";       EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_x1s_S20_EXPERIMENTAL.zip" ;;
-  z3s) CODENAMES="z3s";         BDEV="Galaxy S20 Ultra    SM-G988B";  KSTR="Galaxy S20 Ultra (SM-G988B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_z3s_S20Ultra_EXPERIMENTAL.zip" ;;
-  g986b) CODENAMES="y2s";        BDEV="Galaxy S20+ 5G    SM-G986B";   KSTR="Galaxy S20+ 5G (SM-G986B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g986b_S20plus5G_EXPERIMENTAL.zip" ;;
-  g981b) CODENAMES="x1s";        BDEV="Galaxy S20 5G    SM-G981B";    KSTR="Galaxy S20 5G (SM-G981B / Exynos 990) [EXPERIMENTAL]";  EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g981b_S205G_EXPERIMENTAL.zip" ;;
-  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s|g986b|g981b)"; exit 1 ;;
+  g985f) CODENAMES="y2s y2slte";  BDEV="Galaxy S20+    SM-G985F";       KSTR="Galaxy S20+ (SM-G985F / Exynos 990)";              EXP="";    ZIP="AnyKernel3_KSUNext_SUSFS_G985F_S20plus.zip" ;;
+  g980f) CODENAMES="x1s x1slte";  BDEV="Galaxy S20    SM-G980F";        KSTR="Galaxy S20 (SM-G980F / Exynos 990) [EXPERIMENTAL]";       EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_G980F_S20_EXPERIMENTAL.zip" ;;
+  g988b) CODENAMES="z3s";         BDEV="Galaxy S20 Ultra    SM-G988B";  KSTR="Galaxy S20 Ultra (SM-G988B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_G988B_S20Ultra_EXPERIMENTAL.zip" ;;
+  g986b) CODENAMES="y2s";         BDEV="Galaxy S20+ 5G    SM-G986B";    KSTR="Galaxy S20+ 5G (SM-G986B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_G986B_S20plus5G_EXPERIMENTAL.zip" ;;
+  g981b) CODENAMES="x1s";         BDEV="Galaxy S20 5G    SM-G981B";     KSTR="Galaxy S20 5G (SM-G981B / Exynos 990) [EXPERIMENTAL]";  EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_G981B_S20_5G_EXPERIMENTAL.zip" ;;
+  *)   echo "Unknown model '$MODEL' (use g985f|g980f|g988b|g986b|g981b)"; exit 1 ;;
 esac
 
 IMG="$ROOT/out_$MODEL/arch/arm64/boot/Image"

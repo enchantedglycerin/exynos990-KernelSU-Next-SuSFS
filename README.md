@@ -8,9 +8,9 @@ One UI 5 / Android 13) — no custom ROM required.
 
 | Model | Codename | `build.sh -m` | Status |
 |:--|:--|:--|:--|
-| Galaxy S20+ (SM-G985F) | y2s | `y2s` | ✅ **Tested** (G985FXXSNHYB1) |
-| Galaxy S20 (SM-G980F) | x1s | `x1s` | ⚠️ Experimental — untested |
-| Galaxy S20 Ultra (SM-G988B) | z3s | `z3s` | ⚠️ Experimental — untested |
+| Galaxy S20+ (SM-G985F) | y2s | `g985f` | ✅ **Tested** (G985FXXSNHYB1) |
+| Galaxy S20 (SM-G980F) | x1s | `g980f` | ⚠️ Experimental — untested |
+| Galaxy S20 Ultra (SM-G988B) | z3s | `g988b` | ⚠️ Experimental — untested |
 | Galaxy S20+ 5G (SM-G986B) | y2s | `g986b` | ⚠️ Experimental — untested |
 | Galaxy S20 5G (SM-G981B) | x1s | `g981b` | ⚠️ Experimental — untested |
 
@@ -27,7 +27,7 @@ One UI 5 / Android 13) — no custom ROM required.
 ```sh
 # Toolchain: AOSP Clang r370808 (10.0.1) + GCC 4.9. Place at ../tc/clang10 and ../tc/gcc49,
 # or export CLANG_DIR / GCC_DIR. DO NOT use Clang 14+ (bootloops Exynos 990).
-./build.sh -m y2s        # or x1s / z3s / g986b / g981b
+./build.sh -m g985f      # or g980f / g988b / g986b / g981b
 # -> out_<model>/arch/arm64/boot/Image
 ```
 
@@ -39,8 +39,8 @@ Config is layered: `arch/arm64/configs/exynos9830-<model>_defconfig` (Samsung ba
 Build a flashable zip from the Image with the bundled packaging:
 
 ```sh
-./build.sh -m y2s        # -> out_y2s/arch/arm64/boot/Image
-./mkzip.sh  -m y2s       # -> AnyKernel3_KSUNext_SUSFS_y2s.zip   (or x1s / z3s)
+./build.sh -m g985f      # -> out_g985f/arch/arm64/boot/Image
+./mkzip.sh  -m g985f     # -> AnyKernel3_KSUNext_SUSFS_G985F_S20plus.zip   (or g980f / g988b / ...)
 ```
 
 `mkzip.sh` wraps the built Image in the vendored [AnyKernel3](https://github.com/osm0sis/AnyKernel3)

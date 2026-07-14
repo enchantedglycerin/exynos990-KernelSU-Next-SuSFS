@@ -3,10 +3,10 @@
 #  KernelSU-Next + SuSFS v2.0.0  —  Galaxy S20 (Exynos 990 / universal9830)
 #  Unified build for all S20 Exynos variants.
 #
-#  Usage:   ./build.sh -m <y2s|x1s|z3s|g986b|g981b>
-#             y2s   = Galaxy S20+ 4G   (SM-G985F)   [TESTED]
-#             x1s   = Galaxy S20 4G    (SM-G980F)   [EXPERIMENTAL]
-#             z3s   = Galaxy S20 Ultra (SM-G988B)   [EXPERIMENTAL]
+#  Usage:   ./build.sh -m <g985f|g980f|g988b|g986b|g981b>   (model number, as in Settings)
+#             g985f = Galaxy S20+ 4G   (SM-G985F)   [TESTED]
+#             g980f = Galaxy S20 4G    (SM-G980F)   [EXPERIMENTAL]
+#             g988b = Galaxy S20 Ultra (SM-G988B)   [EXPERIMENTAL]
 #             g986b = Galaxy S20+ 5G   (SM-G986B)   [EXPERIMENTAL]
 #             g981b = Galaxy S20 5G    (SM-G981B)   [EXPERIMENTAL]
 #
@@ -21,15 +21,15 @@
 # ============================================================================
 set -e
 
-MODEL=y2s
+MODEL=g985f
 while getopts "m:" o; do case $o in m) MODEL=$OPTARG ;; esac; done
 case "$MODEL" in
-  y2s) BASE=exynos9830-y2slte_defconfig ;;
-  x1s) BASE=exynos9830-x1slte_defconfig ;;
-  z3s) BASE=exynos9830-z3sxxx_defconfig ;;
+  g985f) BASE=exynos9830-y2slte_defconfig ;;
+  g980f) BASE=exynos9830-x1slte_defconfig ;;
+  g988b) BASE=exynos9830-z3sxxx_defconfig ;;
   g986b) BASE=exynos9830-y2sxxx_defconfig ;;
   g981b) BASE=exynos9830-x1sxxx_defconfig ;;
-  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s|g986b|g981b)"; exit 1 ;;
+  *)   echo "Unknown model '$MODEL' (use g985f|g980f|g988b|g986b|g981b)"; exit 1 ;;
 esac
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"
