@@ -1,7 +1,7 @@
 #!/bin/bash
 # mkzip.sh -- build a flashable AnyKernel3 zip from an already-built kernel Image.
 #
-# Usage:   ./mkzip.sh -m <y2s|x1s|z3s>
+# Usage:   ./mkzip.sh -m <y2s|x1s|z3s|g986b|g981b>
 #   Requires ./build.sh -m <model> to have produced out_<model>/arch/arm64/boot/Image.
 #   Produces AnyKernel3_KSUNext_SUSFS_<model>[_EXPERIMENTAL].zip in the repo root.
 #
@@ -10,8 +10,9 @@
 # getprop for the model is unreliable and falsely rejected a genuine SM-G985F (which
 # reports ro.product.device=y2s and model=SM-G985F when booted, but does NOT return
 # the model in TWRP). The codename is consistent between boot and recovery. Note the
-# 4G/5G siblings can share a codename, so a codename check cannot exclude an unsourced
-# 5G variant -- check your exact model before flashing. See README.md / PROVENANCE.md.
+# 4G/5G siblings share a codename (G985F/G986B=y2s, G980F/G981B=x1s), so a codename
+# check cannot tell them apart -- check your exact model before flashing. Non-G985F
+# targets are the G985F driver kernel with that model's config. See README/PROVENANCE.
 set -e
 MODEL=y2s
 while getopts "m:" o; do case $o in m) MODEL=$OPTARG ;; esac; done
@@ -20,7 +21,7 @@ ROOT="$(cd "$(dirname "$0")" && pwd)"
 case "$MODEL" in
   y2s) CODENAMES="y2s y2slte";  BDEV="Galaxy S20+    SM-G985F";       KSTR="Galaxy S20+ (SM-G985F / Exynos 990)";              EXP="";    ZIP="AnyKernel3_KSUNext_SUSFS_y2s.zip" ;;
   x1s) CODENAMES="x1s x1slte";  BDEV="Galaxy S20    SM-G980F";        KSTR="Galaxy S20 (SM-G980F / Exynos 990) [EXPERIMENTAL]";       EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_x1s_S20_EXPERIMENTAL.zip" ;;
-  z3s) CODENAMES="z3s z3slte";  BDEV="Galaxy S20 Ultra    SM-G988B";  KSTR="Galaxy S20 Ultra (SM-G988B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_z3s_S20Ultra_EXPERIMENTAL.zip" ;;
+  z3s) CODENAMES="z3s";         BDEV="Galaxy S20 Ultra    SM-G988B";  KSTR="Galaxy S20 Ultra (SM-G988B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_z3s_S20Ultra_EXPERIMENTAL.zip" ;;
   g986b) CODENAMES="y2s";        BDEV="Galaxy S20+ 5G    SM-G986B";   KSTR="Galaxy S20+ 5G (SM-G986B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g986b_S20plus5G_EXPERIMENTAL.zip" ;;
   g981b) CODENAMES="x1s";        BDEV="Galaxy S20 5G    SM-G981B";    KSTR="Galaxy S20 5G (SM-G981B / Exynos 990) [EXPERIMENTAL]";  EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g981b_S205G_EXPERIMENTAL.zip" ;;
   *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s|g986b|g981b)"; exit 1 ;;

@@ -4,12 +4,16 @@
 #  Unified build for all S20 Exynos variants.
 #
 #  Usage:   ./build.sh -m <y2s|x1s|z3s|g986b|g981b>
-#             y2s = Galaxy S20+  (SM-G985F/G986B)   [TESTED]
-#             x1s = Galaxy S20   (SM-G980F/G981B)   [EXPERIMENTAL]
-#             z3s = Galaxy S20 Ultra (SM-G988B)     [EXPERIMENTAL]
+#             y2s   = Galaxy S20+ 4G   (SM-G985F)   [TESTED]
+#             x1s   = Galaxy S20 4G    (SM-G980F)   [EXPERIMENTAL]
+#             z3s   = Galaxy S20 Ultra (SM-G988B)   [EXPERIMENTAL]
+#             g986b = Galaxy S20+ 5G   (SM-G986B)   [EXPERIMENTAL]
+#             g981b = Galaxy S20 5G    (SM-G981B)   [EXPERIMENTAL]
 #
 #  Config is layered:  arch/arm64/configs/exynos9830-<model>_defconfig  (Samsung base)
 #                    + arch/arm64/configs/ksu.config                    (KSU-Next + SuSFS)
+#  All targets share the G985F drop's kernel DRIVERS (mm / Mali GPU / NPU); only each
+#  model's defconfig + device tree is its own. Only y2s (SM-G985F) is hardware-tested.
 #
 #  Toolchain: AOSP Clang r370808 (10.0.1) + GCC 4.9 (binutils 2.27).
 #    Set CLANG_DIR / GCC_DIR, or place them at ../tc/clang10 and ../tc/gcc49.

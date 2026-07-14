@@ -14,8 +14,9 @@ One UI 5 / Android 13) — no custom ROM required.
 | Galaxy S20+ 5G (SM-G986B) | y2s | `g986b` | ⚠️ Experimental — untested |
 | Galaxy S20 5G (SM-G981B) | x1s | `g981b` | ⚠️ Experimental — untested |
 
-> Only **SM-G985F** is boot-tested. Every other model compiles from its own Samsung source drop with the
-> same integration but has **not** been booted on hardware.
+> Only **SM-G985F** is boot-tested. Every other model is built with **its own defconfig + device tree**
+> on the shared **G985F driver kernel** (the other drops' driver differences — mm, Mali GPU, NPU — are
+> **not** imported; see `PROVENANCE.md`) and has **not** been booted on hardware.
 >
 > **Codename note:** the 4G and 5G siblings report the same `ro.product.device` (G985F & G986B = `y2s`;
 > G980F & G981B = `x1s`), so the flasher's codename check can't tell them apart — pick the zip for your
@@ -26,7 +27,7 @@ One UI 5 / Android 13) — no custom ROM required.
 ```sh
 # Toolchain: AOSP Clang r370808 (10.0.1) + GCC 4.9. Place at ../tc/clang10 and ../tc/gcc49,
 # or export CLANG_DIR / GCC_DIR. DO NOT use Clang 14+ (bootloops Exynos 990).
-./build.sh -m y2s        # or x1s / z3s
+./build.sh -m y2s        # or x1s / z3s / g986b / g981b
 # -> out_<model>/arch/arm64/boot/Image
 ```
 
