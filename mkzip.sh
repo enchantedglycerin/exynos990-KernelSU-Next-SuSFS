@@ -21,7 +21,9 @@ case "$MODEL" in
   y2s) CODENAMES="y2s y2slte";  BDEV="Galaxy S20+    SM-G985F";       KSTR="Galaxy S20+ (SM-G985F / Exynos 990)";              EXP="";    ZIP="AnyKernel3_KSUNext_SUSFS_y2s.zip" ;;
   x1s) CODENAMES="x1s x1slte";  BDEV="Galaxy S20    SM-G980F";        KSTR="Galaxy S20 (SM-G980F / Exynos 990) [EXPERIMENTAL]";       EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_x1s_S20_EXPERIMENTAL.zip" ;;
   z3s) CODENAMES="z3s z3slte";  BDEV="Galaxy S20 Ultra    SM-G988B";  KSTR="Galaxy S20 Ultra (SM-G988B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_z3s_S20Ultra_EXPERIMENTAL.zip" ;;
-  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s)"; exit 1 ;;
+  g986b) CODENAMES="y2s";        BDEV="Galaxy S20+ 5G    SM-G986B";   KSTR="Galaxy S20+ 5G (SM-G986B / Exynos 990) [EXPERIMENTAL]"; EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g986b_S20plus5G_EXPERIMENTAL.zip" ;;
+  g981b) CODENAMES="x1s";        BDEV="Galaxy S20 5G    SM-G981B";    KSTR="Galaxy S20 5G (SM-G981B / Exynos 990) [EXPERIMENTAL]";  EXP="yes"; ZIP="AnyKernel3_KSUNext_SUSFS_g981b_S205G_EXPERIMENTAL.zip" ;;
+  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s|g986b|g981b)"; exit 1 ;;
 esac
 
 IMG="$ROOT/out_$MODEL/arch/arm64/boot/Image"

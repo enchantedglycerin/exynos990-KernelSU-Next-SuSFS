@@ -3,7 +3,7 @@
 #  KernelSU-Next + SuSFS v2.0.0  —  Galaxy S20 (Exynos 990 / universal9830)
 #  Unified build for all S20 Exynos variants.
 #
-#  Usage:   ./build.sh -m <y2s|x1s|z3s>
+#  Usage:   ./build.sh -m <y2s|x1s|z3s|g986b|g981b>
 #             y2s = Galaxy S20+  (SM-G985F/G986B)   [TESTED]
 #             x1s = Galaxy S20   (SM-G980F/G981B)   [EXPERIMENTAL]
 #             z3s = Galaxy S20 Ultra (SM-G988B)     [EXPERIMENTAL]
@@ -23,7 +23,9 @@ case "$MODEL" in
   y2s) BASE=exynos9830-y2slte_defconfig ;;
   x1s) BASE=exynos9830-x1slte_defconfig ;;
   z3s) BASE=exynos9830-z3sxxx_defconfig ;;
-  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s)"; exit 1 ;;
+  g986b) BASE=exynos9830-y2sxxx_defconfig ;;
+  g981b) BASE=exynos9830-x1sxxx_defconfig ;;
+  *)   echo "Unknown model '$MODEL' (use y2s|x1s|z3s|g986b|g981b)"; exit 1 ;;
 esac
 
 ROOT="$(cd "$(dirname "$0")" && pwd)"

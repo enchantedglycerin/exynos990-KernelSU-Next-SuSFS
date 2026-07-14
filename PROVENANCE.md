@@ -6,12 +6,14 @@ One tree builds all Galaxy S20 Exynos variants; device is selected at build time
 ## Samsung source packages (one per device family)
 | Model(s) | Codename | Samsung Open Source package | Role in this tree |
 |:--|:--|:--|:--|
-| Galaxy S20+ / S20+ 5G (SM-G985F / G986B) | y2s | `SM-G985F_SWA_13_Opensource` | **trunk** (shared kernel source + drivers) |
-| Galaxy S20 / S20 5G (SM-G980F / G981B) | x1s | `SM-G980F_13_Opensource` | device tree + defconfig imported |
-| Galaxy S20 Ultra (SM-G988B) | z3s | `SM-G988B_13_Opensource` | device tree + defconfig imported |
+| Galaxy S20+ (SM-G985F) | y2slte | `SM-G985F_SWA_13_Opensource` | **trunk** (shared kernel source + drivers) |
+| Galaxy S20 (SM-G980F) | x1slte | `SM-G980F_13_Opensource` | dts + defconfig imported |
+| Galaxy S20 Ultra (SM-G988B) | z3s | `SM-G988B_13_Opensource` | dts + defconfig imported |
+| Galaxy S20+ 5G (SM-G986B) | y2s | `SM-G986B_13_Opensource` | dts + defconfig imported |
+| Galaxy S20 5G (SM-G981B) | x1s | `SM-G981B_13_Opensource` | dts + defconfig imported |
 
-The three drops share the same universal9830 codebase. The **G985F** drop is the trunk; only the
-**device-specific deltas** from the G980F/G988B drops were imported (their `arch/arm64/boot/dts/samsung/exynos990-*.dts`
+The five drops share the same universal9830 codebase. The **G985F** drop is the trunk; only the
+**device-specific deltas** from the other four drops (G980F / G988B / G986B / G981B) were imported (their `arch/arm64/boot/dts/samsung/exynos990-*.dts`
 and `arch/arm64/configs/exynos9830-*_defconfig`, plus the merged dts Makefile). The shared drivers
 (GPU/NPU/mm) are the G985F-drop revisions — the inter-drop differences there are Samsung packaging-date
 revisions, not per-device changes (same SoC). Each model was clean-built from this tree and produced an
@@ -19,8 +21,10 @@ Image with the **same effective config and identical size** as its standalone pe
 binaries are *not* byte-identical: the kernel embeds a build timestamp / host / version string, so
 SHA-256 differs between builds — reproducible builds are not implemented.)
 
-**5G variants:** SM-G986B (S20+ 5G) and SM-G981B (S20 5G) share the `y2s` / `x1s` codename and source
-respectively; **no separate G986B/G981B source drop was used**, and neither has been verified.
+**Runtime codenames:** the 4G/5G siblings report the same `ro.product.device` — G985F and G986B both
+`y2s`; G980F and G981B both `x1s`; G988B `z3s`. Their *build* codenames differ (defconfig `y2slte` vs
+`y2sxxx`, `x1slte` vs `x1sxxx`), but at runtime the flasher's codename check cannot tell 4G from 5G —
+select the zip for your exact model.
 
 ## Integrated components (exact revisions)
 - **KernelSU-Next** — https://github.com/KernelSU-Next/KernelSU-Next
@@ -43,7 +47,7 @@ AOSP Clang 10.0.1 (r370808) + GCC 4.9 / binutils 2.27. **Do NOT use Clang 14+** 
 - Samsung security disabled for kernel root: CONFIG_UH (RKP), SECURITY_DEFEX, FIVE, RKP_CFP, KDP*, PROCA.
 
 ## Testing status
-Only **SM-G985F** is boot-tested (firmware **G985FXXSNHYB1**, Android 13). **x1s (SM-G980F)** and
-**z3s (SM-G988B)** are compiled from their own Samsung source drop with the same integration but are
-**not boot-tested** — experimental. The 5G variants (G986B / G981B) were not separately sourced and are
-unverified.
+Only **SM-G985F** is boot-tested (firmware **G985FXXSNHYB1**, Android 13). The other four — **G980F**
+(x1s), **G988B** (z3s), **G986B** (y2s / 5G) and **G981B** (x1s / 5G) — are compiled from their own
+Samsung source drop with the same integration but are **not boot-tested**. All non-G985F builds are
+experimental.

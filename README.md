@@ -11,13 +11,15 @@ One UI 5 / Android 13) — no custom ROM required.
 | Galaxy S20+ (SM-G985F) | y2s | `y2s` | ✅ **Tested** (G985FXXSNHYB1) |
 | Galaxy S20 (SM-G980F) | x1s | `x1s` | ⚠️ Experimental — untested |
 | Galaxy S20 Ultra (SM-G988B) | z3s | `z3s` | ⚠️ Experimental — untested |
+| Galaxy S20+ 5G (SM-G986B) | y2s | `g986b` | ⚠️ Experimental — untested |
+| Galaxy S20 5G (SM-G981B) | x1s | `g981b` | ⚠️ Experimental — untested |
 
-> Only **SM-G985F** is boot-tested. The x1s (SM-G980F) and z3s (SM-G988B) builds compile from their own
-> Samsung source drop with the same integration but have **not** been booted on hardware.
+> Only **SM-G985F** is boot-tested. Every other model compiles from its own Samsung source drop with the
+> same integration but has **not** been booted on hardware.
 >
-> **5G variants** — SM-G986B (S20+ 5G) and SM-G981B (S20 5G) — share the `y2s` / `x1s` codename and source,
-> so `build.sh -m y2s` / `-m x1s` *should* apply; however no G986B/G981B source drop was used here and they
-> are **completely unverified**. Not for Snapdragon variants; Android 14+ is unsupported.
+> **Codename note:** the 4G and 5G siblings report the same `ro.product.device` (G985F & G986B = `y2s`;
+> G980F & G981B = `x1s`), so the flasher's codename check can't tell them apart — pick the zip for your
+> exact model. Not for Snapdragon variants; Android 14+ is unsupported.
 
 ## Build
 
