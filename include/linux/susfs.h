@@ -132,6 +132,20 @@ struct st_susfs_sus_map {
 	char                                    target_pathname[SUSFS_MAX_LEN_PATHNAME];
 	int                                     err;
 };
+
+/* sus_anon_range: userspace registers frida's exact injected anonymous
+ * [start,end) so show_map()/show_smap() can hide ONLY those VMAs. */
+struct st_susfs_sus_anon_range {
+	unsigned int                            target_uid;
+	unsigned long                           start;
+	unsigned long                           end;
+	int                                     err;
+};
+
+struct st_susfs_sus_anon_range_hlist {
+	struct st_susfs_sus_anon_range          info;
+	struct list_head                        list;
+};
 #endif
 
 /* avc log spoofing */
@@ -207,6 +221,9 @@ struct filename* susfs_get_redirected_path(unsigned long ino);
 /* sus_map */
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 void susfs_add_sus_map(void __user **user_info);
+void susfs_add_sus_anon_range(void __user **user_info);
+void susfs_del_sus_anon_range(void __user **user_info);
+void susfs_clear_sus_anon_range(void __user **user_info);
 #endif
 
 void susfs_set_avc_log_spoofing(void __user **user_info);

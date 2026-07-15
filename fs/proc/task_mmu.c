@@ -23,6 +23,7 @@
 #include <linux/ctype.h>
 #if defined(CONFIG_KSU_SUSFS_SUS_KSTAT) || defined(CONFIG_KSU_SUSFS_SUS_MAP)
 #include <linux/susfs_def.h>
+#include <linux/cred.h>
 #endif
 
 #include <asm/elf.h>
@@ -482,6 +483,15 @@ done:
 
 static int show_map(struct seq_file *m, void *v)
 {
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	struct vm_area_struct *susfs_vma = v;
+
+	if (!susfs_vma->vm_file && susfs_is_current_proc_umounted() &&
+	    susfs_is_sus_anon_range(current_uid().val, susfs_vma->vm_start, susfs_vma->vm_end)) {
+		m_cache_vma(m, v);
+		return 0;
+	}
+#endif
 	show_map_vma(m, v);
 	m_cache_vma(m, v);
 	return 0;
@@ -920,6 +930,11 @@ static int show_smap(struct seq_file *m, void *v)
 	memset(&mss, 0, sizeof(mss));
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	if (!vma->vm_file && susfs_is_current_proc_umounted() &&
+	    susfs_is_sus_anon_range(current_uid().val, vma->vm_start, vma->vm_end)) {
+		m_cache_vma(m, vma);
+		return 0;
+	}
 	if (vma->vm_file &&
 		unlikely(file_inode(vma->vm_file)->i_mapping->flags & BIT_SUS_MAPS) &&
 		susfs_is_current_proc_umounted())

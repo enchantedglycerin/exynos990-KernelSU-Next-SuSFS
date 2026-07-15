@@ -32,6 +32,9 @@
 #define CMD_SUSFS_SUS_SU 0x60000 /* deprecated */
 #define CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING 0x60010
 #define CMD_SUSFS_ADD_SUS_MAP 0x60020
+#define CMD_SUSFS_ADD_SUS_ANON_RANGE 0x60021
+#define CMD_SUSFS_DEL_SUS_ANON_RANGE 0x60022
+#define CMD_SUSFS_CLEAR_SUS_ANON_RANGE 0x60023
 
 #define SUSFS_MAX_LEN_PATHNAME 256 // 256 should address many paths already unless you are doing some strange experimental stuff, then set your own desired length
 #define SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE 8192 // 8192 is enough I guess
@@ -124,4 +127,10 @@ static inline bool susfs_is_current_proc_umounted(void) {
 static inline void susfs_set_current_proc_umounted(void) {
 	set_ti_thread_flag(&current->thread_info, TIF_PROC_UMOUNTED);
 }
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+/* Defined in fs/susfs.c. Declared here (not susfs.h) so fs/proc/task_mmu.c,
+ * which includes only susfs_def.h, can call it from show_map()/show_smap(). */
+bool susfs_is_sus_anon_range(unsigned int uid, unsigned long start, unsigned long end);
+#endif
 #endif // #ifndef KSU_SUSFS_DEF_H

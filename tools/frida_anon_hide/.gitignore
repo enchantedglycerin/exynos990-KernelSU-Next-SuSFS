@@ -1,0 +1,2 @@
+# build artifact — never commit the compiled binary
+/frida_anon_hide

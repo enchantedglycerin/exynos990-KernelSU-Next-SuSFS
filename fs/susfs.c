@@ -902,6 +902,127 @@ out_copy_to_user:
 	}
 	SUSFS_LOGI("CMD_SUSFS_ADD_SUS_MAP -> ret: %d\n", info.err);
 }
+
+/* sus_anon_range: hide frida's injected anonymous rwx VMAs by exact [start,end).
+ * Userspace re-registers per attach (ASLR moves the range), so add/del/clear. */
+static DEFINE_SPINLOCK(susfs_spin_lock_sus_anon_range);
+static LIST_HEAD(LH_SUS_ANON_RANGE);
+
+void susfs_add_sus_anon_range(void __user **user_info) {
+	struct st_susfs_sus_anon_range info = {0};
+	struct st_susfs_sus_anon_range_hlist *cursor = NULL, *temp = NULL, *new_entry = NULL;
+
+	if (copy_from_user(&info, (struct st_susfs_sus_anon_range __user*)*user_info, sizeof(info))) {
+		info.err = -EFAULT;
+		goto out_copy_to_user;
+	}
+	if (info.start >= info.end) {
+		info.err = -EINVAL;
+		goto out_copy_to_user;
+	}
+
+	/* update in place if (uid,start) already registered */
+	spin_lock(&susfs_spin_lock_sus_anon_range);
+	list_for_each_entry_safe(cursor, temp, &LH_SUS_ANON_RANGE, list) {
+		if (cursor->info.target_uid == info.target_uid &&
+		    cursor->info.start == info.start) {
+			cursor->info.end = info.end;
+			spin_unlock(&susfs_spin_lock_sus_anon_range);
+			info.err = 0;
+			SUSFS_LOGI("updated sus_anon_range uid: %u, [0x%lx, 0x%lx)\n",
+				info.target_uid, info.start, info.end);
+			goto out_copy_to_user;
+		}
+	}
+	spin_unlock(&susfs_spin_lock_sus_anon_range);
+
+	new_entry = kzalloc(sizeof(struct st_susfs_sus_anon_range_hlist), GFP_KERNEL);
+	if (!new_entry) {
+		info.err = -ENOMEM;
+		goto out_copy_to_user;
+	}
+	memcpy(&new_entry->info, &info, sizeof(struct st_susfs_sus_anon_range));
+	INIT_LIST_HEAD(&new_entry->list);
+	spin_lock(&susfs_spin_lock_sus_anon_range);
+	list_add_tail(&new_entry->list, &LH_SUS_ANON_RANGE);
+	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	info.err = 0;
+	SUSFS_LOGI("added sus_anon_range uid: %u, [0x%lx, 0x%lx)\n",
+		info.target_uid, info.start, info.end);
+out_copy_to_user:
+	if (copy_to_user(&((struct st_susfs_sus_anon_range __user*)*user_info)->err, &info.err, sizeof(info.err))) {
+		info.err = -EFAULT;
+	}
+}
+
+void susfs_del_sus_anon_range(void __user **user_info) {
+	struct st_susfs_sus_anon_range info = {0};
+	struct st_susfs_sus_anon_range_hlist *cursor = NULL, *temp = NULL;
+
+	if (copy_from_user(&info, (struct st_susfs_sus_anon_range __user*)*user_info, sizeof(info))) {
+		info.err = -EFAULT;
+		goto out_copy_to_user;
+	}
+	info.err = -ENOENT;
+	spin_lock(&susfs_spin_lock_sus_anon_range);
+	list_for_each_entry_safe(cursor, temp, &LH_SUS_ANON_RANGE, list) {
+		if (cursor->info.target_uid == info.target_uid &&
+		    cursor->info.start == info.start) {
+			list_del(&cursor->list);
+			kfree(cursor);
+			info.err = 0;
+		}
+	}
+	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	SUSFS_LOGI("deleted sus_anon_range uid: %u, start: 0x%lx -> ret: %d\n",
+		info.target_uid, info.start, info.err);
+out_copy_to_user:
+	if (copy_to_user(&((struct st_susfs_sus_anon_range __user*)*user_info)->err, &info.err, sizeof(info.err))) {
+		info.err = -EFAULT;
+	}
+}
+
+void susfs_clear_sus_anon_range(void __user **user_info) {
+	struct st_susfs_sus_anon_range info = {0};
+	struct st_susfs_sus_anon_range_hlist *cursor = NULL, *temp = NULL;
+
+	if (copy_from_user(&info, (struct st_susfs_sus_anon_range __user*)*user_info, sizeof(info))) {
+		info.err = -EFAULT;
+		goto out_copy_to_user;
+	}
+	spin_lock(&susfs_spin_lock_sus_anon_range);
+	list_for_each_entry_safe(cursor, temp, &LH_SUS_ANON_RANGE, list) {
+		if (cursor->info.target_uid == info.target_uid) {
+			list_del(&cursor->list);
+			kfree(cursor);
+		}
+	}
+	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	info.err = 0;
+	SUSFS_LOGI("cleared all sus_anon_range for uid: %u\n", info.target_uid);
+out_copy_to_user:
+	if (copy_to_user(&((struct st_susfs_sus_anon_range __user*)*user_info)->err, &info.err, sizeof(info.err))) {
+		info.err = -EFAULT;
+	}
+}
+
+/* Called from show_map()/show_smap(); exact [start,end) match, uid-scoped. */
+bool susfs_is_sus_anon_range(unsigned int uid, unsigned long start, unsigned long end) {
+	struct st_susfs_sus_anon_range_hlist *cursor = NULL;
+	bool found = false;
+
+	spin_lock(&susfs_spin_lock_sus_anon_range);
+	list_for_each_entry(cursor, &LH_SUS_ANON_RANGE, list) {
+		if (cursor->info.target_uid == uid &&
+		    cursor->info.start == start &&
+		    cursor->info.end == end) {
+			found = true;
+			break;
+		}
+	}
+	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	return found;
+}
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 
 /* susfs avc log spoofing */
