@@ -118,6 +118,10 @@
 #include <linux/security.h>
 #include <linux/freezer.h>
 #include <linux/file.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+#endif
 
 #include "scm.h"
 
@@ -2814,6 +2818,11 @@ static int unix_seq_show(struct seq_file *seq, void *v)
 	else {
 		struct sock *s = v;
 		struct unix_sock *u = unix_sk(s);
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		if (susfs_is_current_proc_umounted() &&
+		    susfs_is_sus_net_unix(current_uid().val, sock_i_ino(s)))
+			return 0;
+#endif
 		unix_state_lock(s);
 
 		seq_printf(seq, "%pK: %08X %08X %08X %04X %02X %5lu",

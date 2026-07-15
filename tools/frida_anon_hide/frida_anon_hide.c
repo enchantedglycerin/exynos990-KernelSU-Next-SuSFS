@@ -42,12 +42,19 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <dirent.h>
 
 #define KSU_MAGIC1   0xDEADBEEFu
 #define SUSFS_MAGIC  0xFAFAFAFAu
 #define CMD_ADD      0x60021u
 #define CMD_DEL      0x60022u
 #define CMD_CLEAR    0x60023u
+#define CMD_ADD_NET_PORT   0x60024u
+#define CMD_DEL_NET_PORT   0x60025u
+#define CMD_CLEAR_NET_PORT 0x60026u
+#define CMD_ADD_NET_UNIX   0x60027u
+#define CMD_DEL_NET_UNIX   0x60028u
+#define CMD_CLEAR_NET_UNIX 0x60029u
 
 // Must be byte-compatible with kernel struct st_susfs_sus_anon_range (LP64):
 //   u32 target_uid; <4 pad>; u64 start; u64 end; int err; <4 pad>  => 32 bytes
@@ -55,6 +62,20 @@ struct anon_range {
 	unsigned int  target_uid;
 	unsigned long start;
 	unsigned long end;
+	int           err;
+};
+
+// kernel st_susfs_sus_net_port: u32 uid; u32 port; int err;  => 12 bytes
+struct net_port {
+	unsigned int target_uid;
+	unsigned int port;
+	int          err;
+};
+
+// kernel st_susfs_sus_net_unix: u32 uid; <4 pad>; u64 inode; int err;  => 24 bytes
+struct net_unix {
+	unsigned int  target_uid;
+	unsigned long inode;
 	int           err;
 };
 
@@ -72,6 +93,133 @@ static int susfs_call(unsigned int cmd, struct anon_range *info)
 	// The kernel overwrites ->err via copy_to_user() ONLY if the dispatch ran.
 	// Still-sentinel => not root, or a kernel without sus_anon_range support.
 	return info->err;
+}
+
+// Generic dispatch for any info struct; caller passes the address of its err field.
+static int susfs_call_raw(unsigned int cmd, void *info, int *errp)
+{
+	*errp = ERR_SENTINEL;
+	syscall(SYS_reboot, (long)KSU_MAGIC1, (long)SUSFS_MAGIC, (long)cmd, info);
+	return *errp;
+}
+
+// ---- sus_net: hide a running server's LISTEN port + abstract unix socket ----
+static int inode_in(const unsigned long *inodes, int n, unsigned long ino)
+{
+	for (int i = 0; i < n; i++)
+		if (inodes[i] == ino)
+			return 1;
+	return 0;
+}
+
+// socket inodes owned by pid (from /proc/<pid>/fd -> "socket:[<inode>]")
+static int collect_pid_sock_inodes(int pid, unsigned long *inodes, int max)
+{
+	char dir[64], link[128], target[128];
+	struct dirent *e;
+	DIR *d;
+	int n = 0;
+
+	snprintf(dir, sizeof(dir), "/proc/%d/fd", pid);
+	d = opendir(dir);
+	if (!d) {
+		fprintf(stderr, "cannot open %s: %s\n", dir, strerror(errno));
+		return -1;
+	}
+	while ((e = readdir(d)) && n < max) {
+		ssize_t len;
+		unsigned long ino;
+		if (e->d_name[0] == '.')
+			continue;
+		snprintf(link, sizeof(link), "%s/%s", dir, e->d_name);
+		len = readlink(link, target, sizeof(target) - 1);
+		if (len <= 0)
+			continue;
+		target[len] = '\0';
+		if (sscanf(target, "socket:[%lu]", &ino) == 1)
+			inodes[n++] = ino;
+	}
+	closedir(d);
+	return n;
+}
+
+static int split_fields(char *line, char **fields, int max)
+{
+	int n = 0;
+	char *t = strtok(line, " \t\n");
+	while (t && n < max) {
+		fields[n++] = t;
+		t = strtok(NULL, " \t\n");
+	}
+	return n;
+}
+
+// register LISTEN (st==0A) local ports from /proc/net/{tcp,tcp6} owned by socks[]
+static int register_listen_ports(const char *path, unsigned int uid,
+				 const unsigned long *socks, int ns)
+{
+	FILE *f = fopen(path, "r");
+	char line[512];
+	char *fields[16];
+	int done = 0;
+
+	if (!f)
+		return 0; // tcp6 may be absent
+	if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; } // header
+	while (fgets(line, sizeof(line), f)) {
+		unsigned int port = 0, st;
+		unsigned long ino;
+		int nf = split_fields(line, fields, 16);
+		if (nf < 10)
+			continue;
+		st = (unsigned int)strtoul(fields[3], NULL, 16);
+		ino = strtoul(fields[9], NULL, 10);
+		if (st != 0x0A || !inode_in(socks, ns, ino)) // 0x0A = TCP_LISTEN
+			continue;
+		sscanf(fields[1], "%*[0-9A-Fa-f]:%x", &port);
+		if (port) {
+			struct net_port np = { .target_uid = uid, .port = port };
+			susfs_call_raw(CMD_ADD_NET_PORT, &np, &np.err);
+			printf("net-port uid=%u port=%u (inode %lu) -> %s\n", uid, port, ino,
+			       np.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
+			       np.err ? strerror(-np.err) : "ok");
+			done++;
+		}
+	}
+	fclose(f);
+	return done;
+}
+
+// register abstract/unix socket inodes from /proc/net/unix owned by socks[]
+static int register_unix_inodes(const char *path, unsigned int uid,
+				const unsigned long *socks, int ns)
+{
+	FILE *f = fopen(path, "r");
+	char line[512];
+	char *fields[16];
+	int done = 0;
+
+	if (!f)
+		return 0;
+	if (!fgets(line, sizeof(line), f)) { fclose(f); return 0; } // header
+	while (fgets(line, sizeof(line), f)) {
+		unsigned long ino;
+		int nf = split_fields(line, fields, 16);
+		if (nf < 7)
+			continue;
+		ino = strtoul(fields[6], NULL, 10);
+		if (!ino || !inode_in(socks, ns, ino))
+			continue;
+		struct net_unix nu = { .target_uid = uid, .inode = ino };
+		susfs_call_raw(CMD_ADD_NET_UNIX, &nu, &nu.err);
+		printf("net-unix uid=%u inode=%lu (%s) -> %s\n", uid, ino,
+		       nf >= 8 ? fields[7] : "",
+		       nu.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
+		       nu.err ? strerror(-nu.err) : "ok");
+		done++;
+	}
+	fclose(f);
+	return done;
 }
 
 // Parse one /proc/<pid>/maps line. Returns 1 and fills s,e for an rwx mapping
@@ -171,12 +319,13 @@ static void usage(const char *a0)
 {
 	fprintf(stderr,
 		"usage:\n"
-		"  %s add      <uid> <start_hex> <end_hex>\n"
-		"  %s del      <uid> <start_hex>\n"
-		"  %s clear    <uid>\n"
-		"  %s scan     <pid>\n"
-		"  %s autohide <uid> <pid> [baseline_file]\n",
-		a0, a0, a0, a0, a0);
+		"  %s add          <uid> <start_hex> <end_hex>\n"
+		"  %s del          <uid> <start_hex>\n"
+		"  %s clear        <uid>\n"
+		"  %s scan         <pid>\n"
+		"  %s autohide     <uid> <pid> [baseline_file]  # hide frida rwx maps\n"
+		"  %s autohide-net <uid> <frida_server_pid>     # hide frida LISTEN port + unix socket\n",
+		a0, a0, a0, a0, a0, a0);
 }
 
 int main(int argc, char **argv)
@@ -263,6 +412,32 @@ int main(int argc, char **argv)
 		fprintf(stderr, "registered %d/%d rwx-anon range(s)%s\n",
 			done, n, bn ? " (new vs baseline)" : "");
 		return rc;
+	}
+
+	if (!strcmp(argv[1], "autohide-net") && argc == 4) {
+		unsigned int uid = (unsigned int)strtoul(argv[2], NULL, 0);
+		int fspid = atoi(argv[3]);
+		unsigned long socks[MAX_RANGES];
+		int ns = collect_pid_sock_inodes(fspid, socks, MAX_RANGES);
+		int ports, units;
+		struct net_port pc = { .target_uid = uid };
+		struct net_unix uc = { .target_uid = uid };
+		if (ns < 0)
+			return 1;
+		// transactional: clear the uid's net sets first (re-registered per start)
+		susfs_call_raw(CMD_CLEAR_NET_PORT, &pc, &pc.err);
+		if (pc.err == ERR_SENTINEL) {
+			fprintf(stderr, "autohide-net: FAILED -- kernel did not dispatch "
+				"(need root + a sus_net kernel)\n");
+			return 1;
+		}
+		susfs_call_raw(CMD_CLEAR_NET_UNIX, &uc, &uc.err);
+		ports = register_listen_ports("/proc/net/tcp", uid, socks, ns)
+		      + register_listen_ports("/proc/net/tcp6", uid, socks, ns);
+		units = register_unix_inodes("/proc/net/unix", uid, socks, ns);
+		fprintf(stderr, "registered %d listen port(s), %d unix socket(s) for uid %u "
+			"(fs pid %d, %d owned sockets)\n", ports, units, uid, fspid, ns);
+		return 0;
 	}
 
 	usage(argv[0]);

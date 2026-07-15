@@ -74,6 +74,10 @@
 #include <linux/scatterlist.h>
 
 #include <trace/events/tcp.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+#endif
 
 #ifndef CONFIG_MPTCP
 static void	tcp_v6_send_reset(const struct sock *sk, struct sk_buff *skb);
@@ -2181,6 +2185,12 @@ static int tcp6_seq_show(struct seq_file *seq, void *v)
 		goto out;
 	}
 	st = seq->private;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	if (susfs_is_current_proc_umounted() && sk->sk_state == TCP_LISTEN &&
+	    susfs_is_sus_net_port(current_uid().val, ntohs(inet_sk(sk)->inet_sport)))
+		return 0;
+#endif
 
 	if (sk->sk_state == TCP_TIME_WAIT)
 		get_timewait6_sock(seq, v, st->num);

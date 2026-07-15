@@ -90,6 +90,10 @@
 #include <linux/scatterlist.h>
 
 #include <trace/events/tcp.h>
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#include <linux/cred.h>
+#include <linux/susfs_def.h>
+#endif
 
 #ifdef CONFIG_TCP_MD5SIG
 static int tcp_v4_md5_hash_hdr(char *md5_hash, const struct tcp_md5sig_key *key,
@@ -2595,6 +2599,12 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 		goto out;
 	}
 	st = seq->private;
+
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+	if (susfs_is_current_proc_umounted() && sk->sk_state == TCP_LISTEN &&
+	    susfs_is_sus_net_port(current_uid().val, ntohs(inet_sk(sk)->inet_sport)))
+		return 0;
+#endif
 
 	if (sk->sk_state == TCP_TIME_WAIT)
 		get_timewait4_sock(v, seq, st->num);
