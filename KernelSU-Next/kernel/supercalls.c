@@ -943,30 +943,6 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
             susfs_clear_sus_anon_range(arg);
             return 0;
         }
-        if (cmd == CMD_SUSFS_ADD_SUS_NET_PORT) {
-            susfs_add_sus_net_port(arg);
-            return 0;
-        }
-        if (cmd == CMD_SUSFS_DEL_SUS_NET_PORT) {
-            susfs_del_sus_net_port(arg);
-            return 0;
-        }
-        if (cmd == CMD_SUSFS_CLEAR_SUS_NET_PORT) {
-            susfs_clear_sus_net_port(arg);
-            return 0;
-        }
-        if (cmd == CMD_SUSFS_ADD_SUS_NET_UNIX) {
-            susfs_add_sus_net_unix(arg);
-            return 0;
-        }
-        if (cmd == CMD_SUSFS_DEL_SUS_NET_UNIX) {
-            susfs_del_sus_net_unix(arg);
-            return 0;
-        }
-        if (cmd == CMD_SUSFS_CLEAR_SUS_NET_UNIX) {
-            susfs_clear_sus_net_unix(arg);
-            return 0;
-        }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
         if (cmd == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
             susfs_set_avc_log_spoofing(arg);
