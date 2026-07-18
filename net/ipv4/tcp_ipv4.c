@@ -2602,8 +2602,13 @@ static int tcp4_seq_show(struct seq_file *seq, void *v)
 
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
 	if (susfs_is_current_proc_umounted() && sk->sk_state == TCP_LISTEN &&
-	    susfs_is_sus_net_port(current_uid().val, ntohs(inet_sk(sk)->inet_sport)))
+	    susfs_is_sus_net_port(current_uid().val, ntohs(inet_sk(sk)->inet_sport))) {
+		/* tcp_seq_next() already advanced st->num for this socket; undo it so
+		 * the suppressed row leaves no gap in the /proc/net/tcp sl indices
+		 * (a contiguity gap would itself reveal that a row was filtered). */
+		st->num--;
 		return 0;
+	}
 #endif
 
 	if (sk->sk_state == TCP_TIME_WAIT)

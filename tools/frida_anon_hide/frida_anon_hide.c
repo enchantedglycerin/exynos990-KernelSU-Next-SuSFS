@@ -156,7 +156,7 @@ static int split_fields(char *line, char **fields, int max)
 
 // register LISTEN (st==0A) local ports from /proc/net/{tcp,tcp6} owned by socks[]
 static int register_listen_ports(const char *path, unsigned int uid,
-				 const unsigned long *socks, int ns)
+				 const unsigned long *socks, int ns, int *nfail)
 {
 	FILE *f = fopen(path, "r");
 	char line[512];
@@ -183,7 +183,10 @@ static int register_listen_ports(const char *path, unsigned int uid,
 			printf("net-port uid=%u port=%u (inode %lu) -> %s\n", uid, port, ino,
 			       np.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
 			       np.err ? strerror(-np.err) : "ok");
-			done++;
+			if (np.err)
+				(*nfail)++;
+			else
+				done++;
 		}
 	}
 	fclose(f);
@@ -192,7 +195,7 @@ static int register_listen_ports(const char *path, unsigned int uid,
 
 // register abstract/unix socket inodes from /proc/net/unix owned by socks[]
 static int register_unix_inodes(const char *path, unsigned int uid,
-				const unsigned long *socks, int ns)
+				const unsigned long *socks, int ns, int *nfail)
 {
 	FILE *f = fopen(path, "r");
 	char line[512];
@@ -216,7 +219,10 @@ static int register_unix_inodes(const char *path, unsigned int uid,
 		       nf >= 8 ? fields[7] : "",
 		       nu.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
 		       nu.err ? strerror(-nu.err) : "ok");
-		done++;
+		if (nu.err)
+			(*nfail)++;
+		else
+			done++;
 	}
 	fclose(f);
 	return done;
@@ -422,6 +428,8 @@ int main(int argc, char **argv)
 		int ports, units;
 		struct net_port pc = { .target_uid = uid };
 		struct net_unix uc = { .target_uid = uid };
+		char pt[64], pt6[64], pu[64];
+		int nfail = 0;
 		if (ns < 0)
 			return 1;
 		// transactional: clear the uid's net sets first (re-registered per start)
@@ -432,11 +440,18 @@ int main(int argc, char **argv)
 			return 1;
 		}
 		susfs_call_raw(CMD_CLEAR_NET_UNIX, &uc, &uc.err);
-		ports = register_listen_ports("/proc/net/tcp", uid, socks, ns)
-		      + register_listen_ports("/proc/net/tcp6", uid, socks, ns);
-		units = register_unix_inodes("/proc/net/unix", uid, socks, ns);
+		snprintf(pt, sizeof(pt), "/proc/%d/net/tcp", fspid);
+		snprintf(pt6, sizeof(pt6), "/proc/%d/net/tcp6", fspid);
+		snprintf(pu, sizeof(pu), "/proc/%d/net/unix", fspid);
+		ports = register_listen_ports(pt, uid, socks, ns, &nfail)
+		      + register_listen_ports(pt6, uid, socks, ns, &nfail);
+		units = register_unix_inodes(pu, uid, socks, ns, &nfail);
 		fprintf(stderr, "registered %d listen port(s), %d unix socket(s) for uid %u "
-			"(fs pid %d, %d owned sockets)\n", ports, units, uid, fspid, ns);
+			"(fs pid %d, %d owned sockets, %d failed)\n", ports, units, uid, fspid, ns, nfail);
+		if (nfail || (ns > 0 && ports == 0 && units == 0)) {
+			fprintf(stderr, "autohide-net: FAILED -- %d call(s) failed / nothing hidden\n", nfail);
+			return 1;
+		}
 		return 0;
 	}
 
