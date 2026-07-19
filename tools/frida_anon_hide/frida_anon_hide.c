@@ -156,7 +156,8 @@ static int split_fields(char *line, char **fields, int max)
 
 // register LISTEN (st==0A) local ports from /proc/net/{tcp,tcp6} owned by socks[]
 static int register_listen_ports(const char *path, unsigned int uid,
-				 const unsigned long *socks, int ns, int *nfail)
+				 const unsigned long *socks, int ns, int *nfail,
+				 unsigned int *seen, int *nseen, int seencap)
 {
 	FILE *f = fopen(path, "r");
 	char line[512];
@@ -179,11 +180,21 @@ static int register_listen_ports(const char *path, unsigned int uid,
 		sscanf(fields[1], "%*[0-9A-Fa-f]:%x", &port);
 		if (port) {
 			struct net_port np = { .target_uid = uid, .port = port };
+			int i, dup = 0;
+			/* the kernel key is (uid, port); one port can back several LISTEN
+			 * sockets (IPv4/IPv6, SO_REUSEPORT) -> register each port only once */
+			for (i = 0; i < *nseen; i++)
+				if (seen[i] == port) { dup = 1; break; }
+			if (dup)
+				continue;
+			if (*nseen < seencap)
+				seen[(*nseen)++] = port;
 			susfs_call_raw(CMD_ADD_NET_PORT, &np, &np.err);
 			printf("net-port uid=%u port=%u (inode %lu) -> %s\n", uid, port, ino,
 			       np.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
-			       np.err ? strerror(-np.err) : "ok");
-			if (np.err)
+			       (np.err && np.err != -EEXIST) ? strerror(-np.err) : "ok");
+			/* already-registered (0, or -EEXIST on a stricter kernel) == success */
+			if (np.err && np.err != -EEXIST)
 				(*nfail)++;
 			else
 				done++;
@@ -218,8 +229,8 @@ static int register_unix_inodes(const char *path, unsigned int uid,
 		printf("net-unix uid=%u inode=%lu (%s) -> %s\n", uid, ino,
 		       nf >= 8 ? fields[7] : "",
 		       nu.err == ERR_SENTINEL ? "FAILED(no dispatch)" :
-		       nu.err ? strerror(-nu.err) : "ok");
-		if (nu.err)
+		       (nu.err && nu.err != -EEXIST) ? strerror(-nu.err) : "ok");
+		if (nu.err && nu.err != -EEXIST)
 			(*nfail)++;
 		else
 			done++;
@@ -429,22 +440,33 @@ int main(int argc, char **argv)
 		struct net_port pc = { .target_uid = uid };
 		struct net_unix uc = { .target_uid = uid };
 		char pt[64], pt6[64], pu[64];
+		unsigned int seen[MAX_RANGES];
+		int nseen = 0;
 		int nfail = 0;
 		if (ns < 0)
 			return 1;
-		// transactional: clear the uid's net sets first (re-registered per start)
+		// Best-effort clear of the uid's net sets first, then (re)register the
+		// current sockets. Registration is what actually hides the live endpoint,
+		// so we deliberately PROCEED even if a clear is imperfect -- the worst case
+		// is a harmless leftover stale rule, whereas aborting here could leave the
+		// current endpoint visible. Only a total no-dispatch (kernel without
+		// sus_net) is fatal. The sus_net commands share one dispatch path, so the
+		// port and unix clears are all-or-nothing together.
 		susfs_call_raw(CMD_CLEAR_NET_PORT, &pc, &pc.err);
-		if (pc.err == ERR_SENTINEL) {
+		susfs_call_raw(CMD_CLEAR_NET_UNIX, &uc, &uc.err);
+		if (pc.err == ERR_SENTINEL && uc.err == ERR_SENTINEL) {
+			// nothing dispatched at all -> no sus_net kernel; abort. If only one
+			// class dispatched (partial support), fall through and register what
+			// is supported rather than abandon an already-cleared endpoint.
 			fprintf(stderr, "autohide-net: FAILED -- kernel did not dispatch "
 				"(need root + a sus_net kernel)\n");
 			return 1;
 		}
-		susfs_call_raw(CMD_CLEAR_NET_UNIX, &uc, &uc.err);
 		snprintf(pt, sizeof(pt), "/proc/%d/net/tcp", fspid);
 		snprintf(pt6, sizeof(pt6), "/proc/%d/net/tcp6", fspid);
 		snprintf(pu, sizeof(pu), "/proc/%d/net/unix", fspid);
-		ports = register_listen_ports(pt, uid, socks, ns, &nfail)
-		      + register_listen_ports(pt6, uid, socks, ns, &nfail);
+		ports = register_listen_ports(pt, uid, socks, ns, &nfail, seen, &nseen, MAX_RANGES)
+		      + register_listen_ports(pt6, uid, socks, ns, &nfail, seen, &nseen, MAX_RANGES);
 		units = register_unix_inodes(pu, uid, socks, ns, &nfail);
 		fprintf(stderr, "registered %d listen port(s), %d unix socket(s) for uid %u "
 			"(fs pid %d, %d owned sockets, %d failed)\n", ports, units, uid, fspid, ns, nfail);
