@@ -149,6 +149,14 @@ struct st_susfs_sus_anon_range_hlist {
 
 /* sus_net: hide a running server's listening TCP port / abstract unix socket
  * from the umounted target's view of /proc/net/{tcp,tcp6,unix}. */
+struct st_susfs_read_proc_mem {
+	int              target_pid;
+	unsigned long    addr;
+	unsigned int     len;
+	unsigned long    ubuf;
+	int              err;
+};
+
 struct st_susfs_sus_net_port {
 	unsigned int                            target_uid;
 	unsigned int                            port;
@@ -254,6 +262,7 @@ void susfs_clear_sus_net_port(void __user **user_info);
 void susfs_add_sus_net_unix(void __user **user_info);
 void susfs_del_sus_net_unix(void __user **user_info);
 void susfs_clear_sus_net_unix(void __user **user_info);
+void susfs_read_proc_mem(void __user **user_info);
 #endif
 
 void susfs_set_avc_log_spoofing(void __user **user_info);

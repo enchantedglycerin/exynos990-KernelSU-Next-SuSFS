@@ -967,6 +967,10 @@ int ksu_handle_sys_reboot(int magic1, int magic2, unsigned int cmd,
             susfs_clear_sus_net_unix(arg);
             return 0;
         }
+        if (cmd == CMD_SUSFS_READ_PROC_MEM) {
+            susfs_read_proc_mem(arg);
+            return 0;
+        }
 #endif // #ifdef CONFIG_KSU_SUSFS_SUS_MAP
         if (cmd == CMD_SUSFS_ENABLE_AVC_LOG_SPOOFING) {
             susfs_set_avc_log_spoofing(arg);

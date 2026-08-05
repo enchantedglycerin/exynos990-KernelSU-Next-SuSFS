@@ -41,6 +41,7 @@
 #define CMD_SUSFS_ADD_SUS_NET_UNIX 0x60027
 #define CMD_SUSFS_DEL_SUS_NET_UNIX 0x60028
 #define CMD_SUSFS_CLEAR_SUS_NET_UNIX 0x60029
+#define CMD_SUSFS_READ_PROC_MEM 0x60030
 
 #define SUSFS_MAX_LEN_PATHNAME 256 // 256 should address many paths already unless you are doing some strange experimental stuff, then set your own desired length
 #define SUSFS_FAKE_CMDLINE_OR_BOOTCONFIG_SIZE 8192 // 8192 is enough I guess

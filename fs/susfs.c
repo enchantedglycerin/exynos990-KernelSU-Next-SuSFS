@@ -22,6 +22,10 @@
 #include <linux/spinlock.h>
 #include <linux/stat.h>
 #include <linux/uaccess.h>
+#include <linux/mm.h>
+#include <linux/sched.h>
+#include <linux/sched/task.h>
+#include <linux/pid.h>
 #include <linux/version.h>
 #include <linux/fdtable.h>
 #include <linux/statfs.h>
@@ -1028,6 +1032,55 @@ bool susfs_is_sus_anon_range(unsigned int uid, unsigned long start, unsigned lon
  * each server start. Same list/spinlock pattern as sus_anon_range. */
 static DEFINE_SPINLOCK(susfs_spin_lock_sus_net_port);
 static LIST_HEAD(LH_SUS_NET_PORT);
+
+void susfs_read_proc_mem(void __user **user_info) {
+	struct st_susfs_read_proc_mem info = {0};
+	struct task_struct *task = NULL;
+	struct pid *pid_struct;
+	void *kbuf = NULL;
+	int nread;
+
+	if (copy_from_user(&info, (struct st_susfs_read_proc_mem __user*)*user_info, sizeof(info))) {
+		info.err = -EFAULT;
+		goto out;
+	}
+	if (info.len == 0 || info.len > (1u << 20)) {
+		info.err = -EINVAL;
+		goto out;
+	}
+	kbuf = kvmalloc(info.len, GFP_KERNEL);
+	if (!kbuf) {
+		info.err = -ENOMEM;
+		goto out;
+	}
+	rcu_read_lock();
+	pid_struct = find_vpid(info.target_pid);
+	task = pid_struct ? pid_task(pid_struct, PIDTYPE_PID) : NULL;
+	if (task)
+		get_task_struct(task);
+	rcu_read_unlock();
+	if (!task) {
+		info.err = -ESRCH;
+		goto out_free;
+	}
+	nread = access_process_vm(task, info.addr, kbuf, info.len, 0);
+	put_task_struct(task);
+	if (nread <= 0) {
+		info.err = (nread < 0) ? nread : -EIO;
+		goto out_free;
+	}
+	if (copy_to_user((void __user *)info.ubuf, kbuf, nread)) {
+		info.err = -EFAULT;
+		goto out_free;
+	}
+	info.err = nread;
+out_free:
+	kvfree(kbuf);
+out:
+	if (copy_to_user(&((struct st_susfs_read_proc_mem __user*)*user_info)->err, &info.err, sizeof(info.err))) {
+		/* best effort */
+	}
+}
 
 void susfs_add_sus_net_port(void __user **user_info) {
 	struct st_susfs_sus_net_port info = {0};
