@@ -1,39 +1,49 @@
-// frida_anon_hide.c
+// frida_anon_hide.c  (nh -- the SuSFS hardening registrar for stealth frida)
 // -----------------------------------------------------------------------------
-// Userspace companion for the SuSFS "sus_anon_range" kernel filter.
+// Userspace companion for the SuSFS kernel filters on the exynos990
+// KernelSU-Next fork. Registers everything that would otherwise leak the
+// injected frida-server ("gpud") to CRK's anti-cheat, which reads /proc via
+// direct syscalls (bypassing frida's own libc-level cloaks):
 //
-// The patched kernel hides ONLY the anonymous VMAs whose exact [start,end) a
-// root process registers, and only inside the umount-gated target process. This
-// tool registers frida-gum's injected anonymous rwx code region so it disappears
-// from /proc/<pid>/maps and /proc/<pid>/smaps (which CRK's anti-cheat reads via a
-// direct syscall, bypassing frida's own libc-level maps cloak).
+//   * sus_anon_range  -- frida-gum's injected rwx anonymous code region
+//   * sus_net_port/unix -- gpud's LISTEN port + abstract control socket
+//   * sus_path / _loop  -- gpud/nh/gp + the KSU module dir + /data/adb/.ht stage
+//   * sus_map           -- a file-backed mapping to hide by pathname
+//   * avc_log_spoofing  -- suppress the SELinux denials frida trips (dmesg tell)
+//   * hide_sus_mnts     -- hide the module's own mounts from non-su procs
+//   * sus_kstat         -- spoof stat() of a path to mirror a stock reference
 //
-// Kernel ABI (exynos990 KernelSU-Next + SuSFS fork) -- reboot(2) kprobe dispatch:
-//     reboot(magic1=0xDEADBEEF, magic2=0xFAFAFAFA, cmd, &info)      [root only]
-//         cmd 0x60021 = add, 0x60022 = del, 0x60023 = clear
-//     info = struct st_susfs_sus_anon_range (layout must match the kernel struct)
-// magic1 (0xDEADBEEF) is not LINUX_REBOOT_MAGIC1, so the real reboot(2) that runs
-// after the kprobe returns -EINVAL harmlessly -- the device never reboots.
+// Kernel ABI (reboot(2) kprobe dispatch, root only):
+//     reboot(magic1=0xDEADBEEF, magic2=0xFAFAFAFA, cmd, arg)
+//   The KSU reboot hook calls ksu_handle_sys_reboot(m1,m2,cmd,&arg); each susfs
+//   handler takes `void __user **user_info` and reads *user_info == our `arg`.
+//   So userspace passes the struct pointer DIRECTLY as the 4th reboot argument
+//   (identical convention for every command below). magic1 (0xDEADBEEF) is not
+//   LINUX_REBOOT_MAGIC1, so the real reboot after the hook returns -EINVAL
+//   harmlessly -- the device never reboots.
+//
+// Command numbers + struct layouts are byte-verified against the DEVICE kernel:
+//   ksu-mod/exynos990/include/linux/{susfs_def.h,susfs.h}
+//   ksu-mod/exynos990/KernelSU-Next/kernel/supercalls.c (dispatch)
+//   ksu-mod/exynos990/fs/susfs.c (handlers)
 //
 // Build (NDK, static so it runs standalone under su):
 //   $NDK/toolchains/llvm/prebuilt/*/bin/aarch64-linux-android29-clang \
-//       -O2 -static -Wall -o frida_anon_hide frida_anon_hide.c
+//       -O2 -static -Wall -o nh frida_anon_hide.c
 //
 // Usage:
-//   frida_anon_hide add      <uid> <start_hex> <end_hex>
-//   frida_anon_hide del      <uid> <start_hex>
-//   frida_anon_hide clear    <uid>
-//   frida_anon_hide scan     <pid>                     # print rwx anon ranges
-//   frida_anon_hide autohide <uid> <pid> [baseline]    # register rwx anon ranges
-//
-// Surgical (recommended) workflow:
-//   1) BEFORE frida attaches:  frida_anon_hide scan <pid> > /data/local/tmp/base
-//   2) attach frida
-//   3) frida_anon_hide autohide <uid> <pid> /data/local/tmp/base
-//   -> only ranges that appeared AFTER attach (i.e. frida's) get registered.
-// Without a baseline, autohide registers every *unnamed* rwx region; on a stealth
-// frida build that is frida's code page (the app's own JIT is a *named* rwx VMA,
-// e.g. [anon:dalvik-...], so it is not matched).
+//   nh add          <uid> <start_hex> <end_hex>
+//   nh del          <uid> <start_hex>
+//   nh clear        <uid>
+//   nh scan         <pid>
+//   nh autohide     <uid> <pid> [baseline]           # hide frida rwx maps
+//   nh autohide-net <uid> <frida_server_pid>         # hide LISTEN port + unix sock
+//   nh sus-path     <path> [path...]                 # hide path(s) from stat/readdir
+//   nh sus-path-loop <dir>                           # hide a directory subtree
+//   nh sus-map      <path> [path...]                 # hide file-backed mappings
+//   nh avc-spoof    <0|1>                            # SELinux denial log spoofing
+//   nh hide-mnts    <0|1>                            # hide sus mounts (non-su procs)
+//   nh sus-kstat    <target_path> <reference_path>   # spoof stat() to match ref
 // -----------------------------------------------------------------------------
 
 #include <stdio.h>
@@ -42,19 +52,29 @@
 #include <errno.h>
 #include <unistd.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
 #include <dirent.h>
 
 #define KSU_MAGIC1   0xDEADBEEFu
 #define SUSFS_MAGIC  0xFAFAFAFAu
-#define CMD_ADD      0x60021u
-#define CMD_DEL      0x60022u
-#define CMD_CLEAR    0x60023u
+#define CMD_ADD      0x60021u   /* sus_anon_range add   */
+#define CMD_DEL      0x60022u   /* sus_anon_range del   */
+#define CMD_CLEAR    0x60023u   /* sus_anon_range clear */
 #define CMD_ADD_NET_PORT   0x60024u
 #define CMD_DEL_NET_PORT   0x60025u
 #define CMD_CLEAR_NET_PORT 0x60026u
 #define CMD_ADD_NET_UNIX   0x60027u
 #define CMD_DEL_NET_UNIX   0x60028u
 #define CMD_CLEAR_NET_UNIX 0x60029u
+/* --- hardening commands (byte-verified vs exynos990 susfs_def.h) --- */
+#define CMD_ADD_SUS_PATH        0x55550u
+#define CMD_ADD_SUS_PATH_LOOP   0x55553u
+#define CMD_HIDE_SUS_MNTS       0x55561u  /* HIDE_SUS_MNTS_FOR_NON_SU_PROCS */
+#define CMD_ADD_SUS_KSTAT       0x55570u
+#define CMD_ENABLE_AVC_SPOOF    0x60010u
+#define CMD_ADD_SUS_MAP         0x60020u
+
+#define SUS_MAX_PATH 256   /* == kernel SUSFS_MAX_LEN_PATHNAME */
 
 // Must be byte-compatible with kernel struct st_susfs_sus_anon_range (LP64):
 //   u32 target_uid; <4 pad>; u64 start; u64 end; int err; <4 pad>  => 32 bytes
@@ -77,6 +97,41 @@ struct net_unix {
 	unsigned int  target_uid;
 	unsigned long inode;
 	int           err;
+};
+
+// kernel st_susfs_sus_path AND st_susfs_sus_map share this layout:
+//   char target_pathname[256]; int err;   => 260 bytes
+struct path_info {
+	char target_pathname[SUS_MAX_PATH];
+	int  err;
+};
+
+// kernel st_susfs_avc_log_spoofing / st_susfs_hide_sus_mnts...: bool; int err; => 8 bytes
+struct toggle_info {
+	unsigned char enabled;     /* _Bool: kernel reads byte 0 only */
+	unsigned char _pad[3];
+	int           err;
+};
+
+// kernel st_susfs_sus_kstat -- mirror field-for-field (both LP64 aarch64, so the
+// compiler reproduces the kernel's natural alignment exactly).
+struct kstat_info {
+	int                is_statically;
+	unsigned long      target_ino;
+	char               target_pathname[SUS_MAX_PATH];
+	unsigned long      spoofed_ino;
+	unsigned long      spoofed_dev;
+	unsigned int       spoofed_nlink;
+	long long          spoofed_size;
+	long               spoofed_atime_tv_sec;
+	long               spoofed_mtime_tv_sec;
+	long               spoofed_ctime_tv_sec;
+	long               spoofed_atime_tv_nsec;
+	long               spoofed_mtime_tv_nsec;
+	long               spoofed_ctime_tv_nsec;
+	unsigned long      spoofed_blksize;
+	unsigned long long spoofed_blocks;
+	int                err;
 };
 
 #define MAX_RANGES 256
@@ -332,17 +387,99 @@ static int do_add(unsigned int uid, unsigned long s, unsigned long e)
 	return info.err ? 1 : 0;
 }
 
+// ---- path/map/toggle/kstat helpers (all share the reboot dispatch) ----
+
+// Register one path with a {char[256]; int err} command (sus_path / sus_map).
+static int do_path_cmd(unsigned int cmd, const char *label, const char *path)
+{
+	struct path_info info;
+	memset(&info, 0, sizeof(info));
+	strncpy(info.target_pathname, path, SUS_MAX_PATH - 1);
+	susfs_call_raw(cmd, &info, &info.err);
+	if (info.err == ERR_SENTINEL) {
+		fprintf(stderr, "%-13s '%s' -> FAILED: kernel did not dispatch "
+			"(need root + this susfs feature)\n", label, path);
+		return 1;
+	}
+	/* -EEXIST == already hidden == success */
+	printf("%-13s '%s' -> %s (err=%d)\n", label, path,
+	       (info.err && info.err != -EEXIST) ? strerror(-info.err) : "ok", info.err);
+	return (info.err && info.err != -EEXIST) ? 1 : 0;
+}
+
+// Toggle command (avc-spoof / hide-mnts): {bool enabled; int err}.
+static int do_toggle_cmd(unsigned int cmd, const char *label, int enabled)
+{
+	struct toggle_info info;
+	memset(&info, 0, sizeof(info));
+	info.enabled = enabled ? 1 : 0;
+	susfs_call_raw(cmd, &info, &info.err);
+	if (info.err == ERR_SENTINEL) {
+		fprintf(stderr, "%-13s %d -> FAILED: kernel did not dispatch "
+			"(need root + this susfs feature)\n", label, enabled);
+		return 1;
+	}
+	printf("%-13s %d -> %s (err=%d)\n", label, enabled,
+	       info.err ? strerror(-info.err) : "ok", info.err);
+	return info.err ? 1 : 0;
+}
+
+// Spoof target_path's stat() to mirror reference_path (make a live frida file
+// read as a stock file). is_statically=0 => kernel resolves target_ino by path.
+static int do_kstat_cmd(const char *target, const char *ref)
+{
+	struct kstat_info info;
+	struct stat st;
+
+	if (stat(ref, &st) != 0) {
+		fprintf(stderr, "sus-kstat: cannot stat reference '%s': %s\n",
+			ref, strerror(errno));
+		return 1;
+	}
+	memset(&info, 0, sizeof(info));
+	info.is_statically      = 0;
+	strncpy(info.target_pathname, target, SUS_MAX_PATH - 1);
+	info.spoofed_ino        = st.st_ino;
+	info.spoofed_dev        = st.st_dev;
+	info.spoofed_nlink      = st.st_nlink;
+	info.spoofed_size       = st.st_size;
+	info.spoofed_atime_tv_sec  = st.st_atim.tv_sec;
+	info.spoofed_mtime_tv_sec  = st.st_mtim.tv_sec;
+	info.spoofed_ctime_tv_sec  = st.st_ctim.tv_sec;
+	info.spoofed_atime_tv_nsec = st.st_atim.tv_nsec;
+	info.spoofed_mtime_tv_nsec = st.st_mtim.tv_nsec;
+	info.spoofed_ctime_tv_nsec = st.st_ctim.tv_nsec;
+	info.spoofed_blksize    = st.st_blksize;
+	info.spoofed_blocks     = st.st_blocks;
+	susfs_call_raw(CMD_ADD_SUS_KSTAT, &info, &info.err);
+	if (info.err == ERR_SENTINEL) {
+		fprintf(stderr, "sus-kstat '%s' <- '%s' -> FAILED: kernel did not "
+			"dispatch (need root + a sus_kstat kernel)\n", target, ref);
+		return 1;
+	}
+	printf("sus-kstat     '%s' <- '%s' -> %s (err=%d)\n", target, ref,
+	       info.err ? strerror(-info.err) : "ok", info.err);
+	return info.err ? 1 : 0;
+}
+
 static void usage(const char *a0)
 {
 	fprintf(stderr,
+		"nh -- SuSFS hardening registrar for stealth frida (gpud)\n"
 		"usage:\n"
-		"  %s add          <uid> <start_hex> <end_hex>\n"
-		"  %s del          <uid> <start_hex>\n"
-		"  %s clear        <uid>\n"
-		"  %s scan         <pid>\n"
-		"  %s autohide     <uid> <pid> [baseline_file]  # hide frida rwx maps\n"
-		"  %s autohide-net <uid> <frida_server_pid>     # hide frida LISTEN port + unix socket\n",
-		a0, a0, a0, a0, a0, a0);
+		"  %s add           <uid> <start_hex> <end_hex>\n"
+		"  %s del           <uid> <start_hex>\n"
+		"  %s clear         <uid>\n"
+		"  %s scan          <pid>\n"
+		"  %s autohide      <uid> <pid> [baseline_file]  # hide frida rwx maps\n"
+		"  %s autohide-net  <uid> <frida_server_pid>     # hide LISTEN port + unix sock\n"
+		"  %s sus-path      <path> [path...]             # hide path(s) from stat/readdir\n"
+		"  %s sus-path-loop <dir>                        # hide a directory subtree\n"
+		"  %s sus-map       <path> [path...]             # hide file-backed mappings\n"
+		"  %s avc-spoof     <0|1>                        # SELinux denial log spoofing\n"
+		"  %s hide-mnts     <0|1>                        # hide sus mounts (non-su procs)\n"
+		"  %s sus-kstat     <target_path> <reference>    # spoof stat() to match ref\n",
+		a0, a0, a0, a0, a0, a0, a0, a0, a0, a0, a0, a0);
 }
 
 int main(int argc, char **argv)
@@ -476,6 +613,36 @@ int main(int argc, char **argv)
 		}
 		return 0;
 	}
+
+	// ---- hardening subcommands ----
+
+	if (!strcmp(argv[1], "sus-path") && argc >= 3) {
+		int rc = 0;
+		for (int i = 2; i < argc; i++)
+			if (do_path_cmd(CMD_ADD_SUS_PATH, "sus-path", argv[i]))
+				rc = 1;
+		return rc;
+	}
+
+	if (!strcmp(argv[1], "sus-path-loop") && argc == 3)
+		return do_path_cmd(CMD_ADD_SUS_PATH_LOOP, "sus-path-loop", argv[2]);
+
+	if (!strcmp(argv[1], "sus-map") && argc >= 3) {
+		int rc = 0;
+		for (int i = 2; i < argc; i++)
+			if (do_path_cmd(CMD_ADD_SUS_MAP, "sus-map", argv[i]))
+				rc = 1;
+		return rc;
+	}
+
+	if (!strcmp(argv[1], "avc-spoof") && argc == 3)
+		return do_toggle_cmd(CMD_ENABLE_AVC_SPOOF, "avc-spoof", atoi(argv[2]));
+
+	if (!strcmp(argv[1], "hide-mnts") && argc == 3)
+		return do_toggle_cmd(CMD_HIDE_SUS_MNTS, "hide-mnts", atoi(argv[2]));
+
+	if (!strcmp(argv[1], "sus-kstat") && argc == 4)
+		return do_kstat_cmd(argv[2], argv[3]);
 
 	usage(argv[0]);
 	return 2;
