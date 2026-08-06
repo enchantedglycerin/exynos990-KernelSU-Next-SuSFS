@@ -4,8 +4,9 @@ Everything needed to rebuild the **KernelSU-Next + SuSFS Exynos 990 kernel** (wi
 `sus_anon_range` / `sus_net` / `read_proc_mem` (pmread) / **o1c maps-hide + o1d fd-hide**
 features) for the **Galaxy S20+ (SM-G985F)** and flash it — after a total PC loss.
 
-Everything in THIS repo is enough to build **except two gitignored things** you must
-re-obtain: the **toolchain** and **~32 firmware blobs**. Both are covered below.
+Recovery is **self-contained**: the firmware blobs are committed in this repo, and the
+toolchain is one download from this repo's **`toolchain` Release**. Steps below (external
+sources kept as fallbacks in case a backup is ever gone).
 
 - Model: **SM-G985F** (Galaxy S20+ 4G, Exynos 990 / universal9830), codename **y2s**
 - Kernel: Linux **4.19.87**, One UI 5 / Android 13
@@ -37,11 +38,13 @@ AOSP **Clang r370808 (10.0.1)** + **GCC 4.9** (`aarch64-linux-android-4.9`).
 `build.sh` looks for them at `../tc/clang10` and `../tc/gcc49` (siblings of the repo root),
 or wherever you point `CLANG_DIR` / `GCC_DIR`.
 
-- **Preferred — this repo's `toolchain` GitHub Release** (if the tarballs were uploaded):
+- **This repo's `toolchain` Release** (recommended — the exact tarballs, already backed up):
+  <https://github.com/enchantedglycerin/exynos990-susfs-anon-range/releases/tag/toolchain>
   ```sh
+  gh release download toolchain -R enchantedglycerin/exynos990-susfs-anon-range -D ..
   mkdir -p ../tc/clang10 ../tc/gcc49
-  tar -xzf clang10.tar.gz -C ../tc/clang10
-  tar -xzf gcc49.tar.gz   -C ../tc/gcc49
+  tar -xzf ../clang10.tar.gz -C ../tc/clang10
+  tar -xzf ../gcc49.tar.gz   -C ../tc/gcc49
   ```
 - **From Google (canonical):** the aarch64 GCC 4.9 prebuilt is
   `android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9`;
@@ -54,7 +57,7 @@ or wherever you point `CLANG_DIR` / `GCC_DIR`.
 `key_stm/`, `range_sensor/`, …) into the Image; a clean clone is missing them and the
 build will error on the first missing file.
 
-- **Preferred — this repo's `firmware/` backup** (if committed): already present, nothing to do.
+- **Already backed up** — the 32 blobs are committed in `firmware/`; a fresh clone has them. Nothing to do.
 - **From Samsung:** download the **SM-G985F** Open Source drop (e.g. `G985FXXSNHYB1`) from
   <https://opensource.samsung.com> (search `G985F`), unzip the kernel tarball, then:
   ```sh
@@ -86,5 +89,5 @@ Or `fastboot` the `Image` inside a repacked stock `boot.img`.
 |---|---|---|
 | Kernel source + feature commits | ✅ committed | `git clone` (branch `susfs-anon-range`) |
 | `build.sh`, `mkzip.sh`, `anykernel/`, defconfigs, `ksu.config`, `ologk.h` | ✅ committed | `git clone` |
-| Toolchain (Clang r370808 + GCC 4.9) | ❌ gitignored | §2 — Release or AOSP prebuilts |
-| Firmware blobs (~32) | ❌ gitignored (`*.bin`) | §3 — Release backup or Samsung OSRC |
+| Toolchain (Clang r370808 + GCC 4.9) | ⬇️ **Release `toolchain`** | §2 (fallback: AOSP prebuilts) |
+| Firmware blobs (~32) | ✅ **committed** in `firmware/` | — (fallback: Samsung OSRC) |
