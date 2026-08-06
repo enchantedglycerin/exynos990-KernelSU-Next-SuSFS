@@ -911,6 +911,9 @@ out_copy_to_user:
  * Userspace re-registers per attach (ASLR moves the range), so add/del/clear. */
 static DEFINE_SPINLOCK(susfs_spin_lock_sus_anon_range);
 static LIST_HEAD(LH_SUS_ANON_RANGE);
+/* Stealth: single global target uid for the lock-free memfd-hide gate, set as a
+ * side-effect of anon_range add (the post-injection loader registration). */
+unsigned int susfs_memfd_stealth_uid = 0;
 
 void susfs_add_sus_anon_range(void __user **user_info) {
 	struct st_susfs_sus_anon_range info = {0};
@@ -950,6 +953,7 @@ void susfs_add_sus_anon_range(void __user **user_info) {
 	spin_lock(&susfs_spin_lock_sus_anon_range);
 	list_add_tail(&new_entry->list, &LH_SUS_ANON_RANGE);
 	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	susfs_memfd_stealth_uid = info.target_uid;
 	info.err = 0;
 	SUSFS_LOGI("added sus_anon_range uid: %u, [0x%lx, 0x%lx)\n",
 		info.target_uid, info.start, info.end);
@@ -1002,6 +1006,8 @@ void susfs_clear_sus_anon_range(void __user **user_info) {
 		}
 	}
 	spin_unlock(&susfs_spin_lock_sus_anon_range);
+	if (susfs_memfd_stealth_uid == info.target_uid)
+		susfs_memfd_stealth_uid = 0;
 	info.err = 0;
 	SUSFS_LOGI("cleared all sus_anon_range for uid: %u\n", info.target_uid);
 out_copy_to_user:

@@ -139,6 +139,7 @@ static inline void susfs_set_current_proc_umounted(void) {
 /* Defined in fs/susfs.c. Declared here (not susfs.h) so fs/proc/task_mmu.c,
  * which includes only susfs_def.h, can call it from show_map()/show_smap(). */
 bool susfs_is_sus_anon_range(unsigned int uid, unsigned long start, unsigned long end);
+extern unsigned int susfs_memfd_stealth_uid;
 bool susfs_is_sus_net_port(unsigned int uid, unsigned int port);
 bool susfs_is_sus_net_unix(unsigned int uid, unsigned long inode);
 #endif

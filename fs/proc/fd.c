@@ -20,6 +20,28 @@
 #include "internal.h"
 #include "fd.h"
 
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+#include <linux/cred.h>
+#include <linux/string.h>
+extern unsigned int susfs_memfd_stealth_uid;
+/* Hide gum's W^X memfd (jitcache / art-jit-cache) fds from the stealth uid's
+ * own /proc/<pid>/fd view (readlink + readdir) -- same uid-gated way show_map
+ * hides them from /proc/<pid>/maps.  Reveny scans /proc/self/fd via readlink. */
+static bool susfs_is_stealth_memfd_file(struct file *f)
+{
+	if (!f || !f->f_path.dentry)
+		return false;
+	return strstr((const char *)f->f_path.dentry->d_name.name, "jitcache") != NULL ||
+	       strstr((const char *)f->f_path.dentry->d_name.name, "art-jit-cache") != NULL;
+}
+static inline bool susfs_stealth_hide_fd(struct file *f)
+{
+	return susfs_memfd_stealth_uid != 0 &&
+	       current_uid().val == susfs_memfd_stealth_uid &&
+	       susfs_is_stealth_memfd_file(f);
+}
+#endif
+
 static int seq_show(struct seq_file *m, void *v)
 {
 	struct files_struct *files = NULL;
@@ -181,9 +203,17 @@ static int proc_fd_link(struct dentry *dentry, struct path *path)
 		spin_lock(&files->file_lock);
 		fd_file = fcheck_files(files, fd);
 		if (fd_file) {
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+			if (!susfs_stealth_hide_fd(fd_file)) {
+				*path = fd_file->f_path;
+				path_get(&fd_file->f_path);
+				ret = 0;
+			}
+#else
 			*path = fd_file->f_path;
 			path_get(&fd_file->f_path);
 			ret = 0;
+#endif
 		}
 		spin_unlock(&files->file_lock);
 		put_files_struct(files);
@@ -271,6 +301,10 @@ static int proc_readfd_common(struct file *file, struct dir_context *ctx,
 		f = fcheck_files(files, fd);
 		if (!f)
 			continue;
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+		if (susfs_stealth_hide_fd(f))
+			continue;
+#endif
 		data.mode = f->f_mode;
 		rcu_read_unlock();
 		data.fd = fd;

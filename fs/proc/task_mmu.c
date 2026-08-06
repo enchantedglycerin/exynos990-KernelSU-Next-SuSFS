@@ -481,6 +481,17 @@ done:
 	seq_putc(m, '\n');
 }
 
+#ifdef CONFIG_KSU_SUSFS_SUS_MAP
+static bool susfs_is_stealth_memfd(struct vm_area_struct *vma)
+{
+	struct file *f = vma->vm_file;
+	if (!f || !f->f_path.dentry)
+		return false;
+	return strstr((const char *)f->f_path.dentry->d_name.name, "jitcache") != NULL ||
+	       strstr((const char *)f->f_path.dentry->d_name.name, "art-jit-cache") != NULL;
+}
+#endif
+
 static int show_map(struct seq_file *m, void *v)
 {
 #ifdef CONFIG_KSU_SUSFS_SUS_MAP
@@ -488,6 +499,13 @@ static int show_map(struct seq_file *m, void *v)
 
 	if (!susfs_vma->vm_file && susfs_is_current_proc_umounted() &&
 	    susfs_is_sus_anon_range(current_uid().val, susfs_vma->vm_start, susfs_vma->vm_end)) {
+		m_cache_vma(m, v);
+		return 0;
+	}
+	if (susfs_memfd_stealth_uid != 0 &&
+	    current_uid().val == susfs_memfd_stealth_uid &&
+	    susfs_vma->vm_file &&
+	    susfs_is_stealth_memfd(susfs_vma)) {
 		m_cache_vma(m, v);
 		return 0;
 	}
