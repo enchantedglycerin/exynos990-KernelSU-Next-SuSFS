@@ -31,9 +31,13 @@ static inline u32 current_sid(void)
 }
 #endif
 
-// TODO: rename to "ksu"
-#define KERNEL_SU_DOMAIN "su"
-#define KERNEL_SU_FILE "ksu_file"
+// destealth: renamed from "su"/"ksu_file" to evade SELinux context-name probes
+// (Duck Detector). Propagates via KERNEL_SU_CONTEXT / KSU_FILE_CONTEXT to
+// selinux.c, rules.c, ksud.c, app_profile.c, allowlist.c. NOTE: the domain no
+// longer pre-exists in the base policy, so rules.c must ksu_type() it before
+// ksu_permissive(); and the hardcoded literal in extras.c:get_sid() must match.
+#define KERNEL_SU_DOMAIN "vndsvc"
+#define KERNEL_SU_FILE "vndsvc_data"
 
 #define KERNEL_SU_CONTEXT "u:r:" KERNEL_SU_DOMAIN ":s0"
 #define KSU_FILE_CONTEXT "u:object_r:" KERNEL_SU_FILE ":s0"

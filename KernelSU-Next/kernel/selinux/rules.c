@@ -46,6 +46,13 @@ void apply_kernelsu_rules()
 
     db = get_policydb();
 
+    // destealth: stock "su" pre-exists in the base policy; our renamed domain
+    // does NOT, and ksu_permissive()/allow/transition all require the type to
+    // exist (set_type_state returns false otherwise) -> root would brick.
+    // ksu_type() creates it with the "domain" attribute, and add_type()
+    // associates the new type with every role, so "u:r:" KERNEL_SU_DOMAIN ":s0"
+    // is a valid context for the root transition.
+    ksu_type(db, KERNEL_SU_DOMAIN, "domain");
     ksu_permissive(db, KERNEL_SU_DOMAIN);
     ksu_typeattribute(db, KERNEL_SU_DOMAIN, "mlstrustedsubject");
     ksu_typeattribute(db, KERNEL_SU_DOMAIN, "netdomain");
@@ -199,12 +206,17 @@ static void reset_avc_cache()
 	LINUX_VERSION_CODE >= KERNEL_VERSION(6, 4, 0))
     avc_ss_reset(0);
     selnl_notify_policyload(0);
-    selinux_status_update_policyload(0);
+    // destealth: do NOT zero the status-page policyload. A booted device always
+    // has policyload >= 1; KSU setting it to 0 is Duck Detector's
+    // "policyload/access seqno split" tell. avc_ss_reset() already flushes the
+    // kernel AVC so new rules take effect; leave the real boot value intact.
+    // selinux_status_update_policyload(0);
 #else
     struct selinux_avc *avc = selinux_state.avc;
     avc_ss_reset(avc, 0);
     selnl_notify_policyload(0);
-    selinux_status_update_policyload(&selinux_state, 0);
+    // destealth: see above - keep the real status-page policyload, don't zero it.
+    // selinux_status_update_policyload(&selinux_state, 0);
 #endif
     selinux_xfrm_notify_policyload();
 }

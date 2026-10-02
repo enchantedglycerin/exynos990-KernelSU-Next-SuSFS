@@ -64,7 +64,9 @@ static const struct ksu_feature_handler avc_spoof_handler = {
 static int get_sid()
 {
 	// dont load at all if we cant get sids
-	int err = security_secctx_to_secid("u:r:su:s0", strlen("u:r:su:s0"), &su_sid);
+	// destealth: MUST match KERNEL_SU_DOMAIN in selinux.h ("vndsvc"), or
+	// avc_spoof fails to resolve su_sid and disables itself.
+	int err = security_secctx_to_secid("u:r:vndsvc:s0", strlen("u:r:vndsvc:s0"), &su_sid);
 	if (err) {
 		pr_info("avc_spoof/get_sid: su_sid not found!\n");
 		return -1;
