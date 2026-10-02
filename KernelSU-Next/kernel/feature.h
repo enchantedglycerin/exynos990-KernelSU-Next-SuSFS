@@ -9,6 +9,7 @@ enum ksu_feature_id {
 
     // custom extensions
     KSU_FEATURE_AVC_SPOOF = 10003,
+    KSU_FEATURE_SELINUX_HIDE = 10004,
 
     KSU_FEATURE_MAX
 };

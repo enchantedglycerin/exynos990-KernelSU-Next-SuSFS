@@ -40,6 +40,11 @@
 #include "avc_ss.h"
 #include "security.h"
 #include "objsec.h"
+
+#ifdef CONFIG_KSU
+/* selinux_hide: answer app-UID /access queries from the stock-policy snapshot */
+extern ssize_t ksu_selinux_hide_access(char *buf, size_t size);
+#endif
 #include "conditional.h"
 
 enum sel_inos {
@@ -845,6 +850,12 @@ static ssize_t sel_write_access(struct file *file, char *buf, size_t size)
 	u16 tclass;
 	struct av_decision avd;
 	ssize_t length;
+
+#ifdef CONFIG_KSU
+	length = ksu_selinux_hide_access(buf, size);
+	if (length != -ENODATA)
+		return length;
+#endif
 
 	length = avc_has_perm(&selinux_state,
 			      current_sid(), SECINITSID_SECURITY,

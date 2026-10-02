@@ -129,12 +129,14 @@ void on_module_mounted(void)
 }
 
 extern void ksu_avc_spoof_late_init();
+extern void ksu_selinux_hide_late_init(void);
 void on_boot_completed(void)
 {
     ksu_boot_completed = true;
     pr_info("on_boot_completed!\n");
     track_throne(true);
     ksu_avc_spoof_late_init();
+    ksu_selinux_hide_late_init();
 }
 
 #define MAX_ARG_STRINGS 0x7FFFFFFF

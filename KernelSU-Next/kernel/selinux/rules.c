@@ -44,6 +44,9 @@ void apply_kernelsu_rules()
 
     mutex_lock(&ksu_rules);
 
+    /* selinux_hide: snapshot the STOCK policydb before we edit it below */
+    ksu_selinux_hide_snapshot();
+
     db = get_policydb();
 
     // destealth: stock "su" pre-exists in the base policy; our renamed domain
