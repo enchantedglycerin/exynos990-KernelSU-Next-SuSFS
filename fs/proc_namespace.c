@@ -147,6 +147,54 @@ out:
 	return err;
 }
 
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+#ifdef CONFIG_KDP_NS
+#define SUSFS_MNT_SB(m) ((m)->mnt ? (m)->mnt->mnt_sb : NULL)
+#else
+#define SUSFS_MNT_SB(m) ((m)->mnt.mnt_sb)
+#endif
+/* destealth mount-gap: for non-ksu-domain readers, renumber anon-bdev (major 0)
+ * device minors to a gap-free 1..N sequence so a sparse/hidden mount table shows
+ * no gap (reveny mountinfo device-minor check). Display-only -- anon-bdev has no
+ * backing device; real devices (major != 0) are left untouched; bounded cost. */
+static unsigned int susfs_disp_minor(struct proc_mounts *p, struct super_block *sb)
+{
+    struct mount *a, *b;
+    unsigned int self_minor = MINOR(sb->s_dev);
+    unsigned int rank = 1;
+
+    if (MAJOR(sb->s_dev) != 0 || !p || !p->ns || p->ns->mounts > 400 ||
+        !susfs_hide_sus_mnts_for_non_su_procs || susfs_is_current_ksu_domain())
+        return self_minor;
+    list_for_each_entry(a, &p->ns->list, mnt_list) {
+        struct super_block *asb = SUSFS_MNT_SB(a);
+        unsigned int am;
+        bool first = true;
+        if (!asb || MAJOR(asb->s_dev) != 0)
+            continue;
+        am = MINOR(asb->s_dev);
+        if (am >= self_minor)
+            continue;
+        list_for_each_entry(b, &p->ns->list, mnt_list) {
+            struct super_block *bsb;
+            if (b == a)
+                break;
+            bsb = SUSFS_MNT_SB(b);
+            if (bsb && MAJOR(bsb->s_dev) == 0 && MINOR(bsb->s_dev) == am) {
+                first = false;
+                break;
+            }
+        }
+        if (first)
+            rank++;
+    }
+    return rank;
+}
+#else
+static inline unsigned int susfs_disp_minor(struct proc_mounts *p, struct super_block *sb)
+{ return MINOR(sb->s_dev); }
+#endif
+
 static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 {
 	struct proc_mounts *p = m->private;
@@ -165,7 +213,7 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 #endif
 
 	seq_printf(m, "%i %i %u:%u ", r->mnt_id, r->mnt_parent->mnt_id,
-		   MAJOR(sb->s_dev), MINOR(sb->s_dev));
+		   MAJOR(sb->s_dev), susfs_disp_minor(p, sb));
 	if (sb->s_op->show_path) {
 		err = sb->s_op->show_path(m, mnt->mnt_root);
 		if (err)
@@ -186,7 +234,11 @@ static int show_mountinfo(struct seq_file *m, struct vfsmount *mnt)
 	/* Tagged fields ("foo:X" or "bar") */
 	if (IS_MNT_SHARED(r))
 		seq_printf(m, " shared:%i", r->mnt_group_id);
-	if (IS_MNT_SLAVE(r)) {
+	if (IS_MNT_SLAVE(r)
+#ifdef CONFIG_KSU_SUSFS_SUS_MOUNT
+	    && !(susfs_hide_sus_mnts_for_non_su_procs && !susfs_is_current_ksu_domain())  /* destealth: hide master:/propagate_from peer-group gap from non-ksu readers (reveny sub_A73E0) */
+#endif
+	   ) {
 		int master = r->mnt_master->mnt_group_id;
 		int dom = get_dominating_id(r, &p->root);
 		seq_printf(m, " master:%i", master);

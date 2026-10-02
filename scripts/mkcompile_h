@@ -33,11 +33,7 @@ else
 	VERSION=$KBUILD_BUILD_VERSION
 fi
 
-if [ -z "$KBUILD_BUILD_TIMESTAMP" ]; then
-	TIMESTAMP=`date`
-else
-	TIMESTAMP=$KBUILD_BUILD_TIMESTAMP
-fi
+TIMESTAMP="Thu Feb 27 09:56:43 KST 2025"  # destealth: byte-identical stock /proc/version
 if test -z "$KBUILD_BUILD_USER"; then
 	LINUX_COMPILE_BY=$(whoami | sed 's/\\/\\\\/')
 else
@@ -72,7 +68,7 @@ UTS_TRUNCATE="cut -b -$UTS_LEN"
   echo \#define LINUX_COMPILE_BY \"`echo $LINUX_COMPILE_BY | $UTS_TRUNCATE`\"
   echo \#define LINUX_COMPILE_HOST \"`echo $LINUX_COMPILE_HOST | $UTS_TRUNCATE`\"
 
-  echo \#define LINUX_COMPILER \"`$CC -v 2>&1 | grep ' version ' | sed 's/[[:space:]]*$//'`\"
+  echo '#define LINUX_COMPILER "Android (dev based on r349610) clang version 8.0.8 (https://android.googlesource.com/toolchain/clang 4dba9ad555eabb40b39dc53c12d09423e9faea7b) (https://android.googlesource.com/toolchain/llvm ab552995647d484a712bf15f77e6c6f4e8ac532b) (based on LLVM 8.0.8svn)"'
 ) > .tmpcompile
 
 # Only replace the real compile.h if the new one is different,

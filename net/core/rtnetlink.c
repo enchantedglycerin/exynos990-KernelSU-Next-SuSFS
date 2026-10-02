@@ -45,6 +45,7 @@
 #include <linux/uaccess.h>
 
 #include <linux/inet.h>
+#include <linux/cred.h> /* destealth: current_uid() */
 #include <linux/netdevice.h>
 #include <net/switchdev.h>
 #include <net/ip.h>
@@ -1580,6 +1581,9 @@ static int rtnl_fill_link_af(struct sk_buff *skb,
 	return 0;
 }
 
+/* destealth: all-zero MAC handed to unprivileged app callers (uid>=10000) */
+static const unsigned char destealth_zmac[MAX_ADDR_LEN];
+
 static int rtnl_fill_ifinfo(struct sk_buff *skb,
 			    struct net_device *dev, struct net *src_net,
 			    int type, u32 pid, u32 seq, u32 change,
@@ -1646,8 +1650,8 @@ static int rtnl_fill_ifinfo(struct sk_buff *skb,
 		goto nla_put_failure;
 
 	if (dev->addr_len) {
-		if (nla_put(skb, IFLA_ADDRESS, dev->addr_len, dev->dev_addr) ||
-		    nla_put(skb, IFLA_BROADCAST, dev->addr_len, dev->broadcast))
+		if (nla_put(skb, IFLA_ADDRESS, dev->addr_len, current_uid().val >= 10000 ? destealth_zmac : dev->dev_addr) ||
+		    nla_put(skb, IFLA_BROADCAST, dev->addr_len, current_uid().val >= 10000 ? destealth_zmac : dev->broadcast))
 			goto nla_put_failure;
 	}
 
@@ -3927,7 +3931,7 @@ int ndo_dflt_bridge_getlink(struct sk_buff *skb, u32 pid, u32 seq,
 	    (br_dev &&
 	     nla_put_u32(skb, IFLA_MASTER, br_dev->ifindex)) ||
 	    (dev->addr_len &&
-	     nla_put(skb, IFLA_ADDRESS, dev->addr_len, dev->dev_addr)) ||
+	     nla_put(skb, IFLA_ADDRESS, dev->addr_len, current_uid().val >= 10000 ? destealth_zmac : dev->dev_addr)) ||
 	    (dev->ifindex != dev_get_iflink(dev) &&
 	     nla_put_u32(skb, IFLA_LINK, dev_get_iflink(dev))))
 		goto nla_put_failure;

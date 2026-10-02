@@ -41,6 +41,9 @@ export ARCH=arm64 LC_ALL=C
 # Samsung Kconfig macros ($(PLATFORM_VERSION), $(SEC_BUILD_CONF_VENDOR_BUILD_OS)) REQUIRE these,
 # or defconfig parsing fails with "syntax error" and drops subsystems (sdcardfs/mali/hall).
 export PLATFORM_VERSION=13 ANDROID_MAJOR_VERSION=t SEC_BUILD_CONF_VENDOR_BUILD_OS=13
+# destealth: byte-identical stock G985FXXSNHYB1 /proc/version identity
+export KBUILD_BUILD_USER=dpi KBUILD_BUILD_HOST=21DK7906
+export KBUILD_BUILD_TIMESTAMP="Thu Feb 27 09:56:43 +0900 2025"
 
 OUT="out_$MODEL"
 HCF='-fcommon -Wno-error -Wno-deprecated-declarations -Wno-implicit-function-declaration'
